@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>正距円筒図法 → 地球儀・円形切り抜き</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif;color:#222}
+body{margin:16px;background:#fff}
+h1{font-size:20px;margin:0 0 10px}
+h2{font-size:15px;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:380px minmax(620px,1fr);gap:16px;align-items:start}
+.panel{border:1px solid #ccc;border-radius:8px;background:#f7f7f7;padding:12px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:7px 0}
+label{font-size:13px;display:inline-flex;gap:6px;align-items:center}
+input,select,button{font-size:13px}
+input[type=number],input[type=text],select,button{padding:5px 7px}
+input[type=range]{width:135px}
+button{cursor:pointer}
+canvas{border:1px solid #bbb;background:#fff;max-width:100%}
+#sourcePreview{width:100%;height:auto}
+#globeCanvas{width:100%;max-width:760px;height:auto;touch-action:none}
+.small{font-size:12px;color:#666}
+.status{white-space:pre-wrap;font-size:13px;min-height:2em}
+progress{width:100%}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<h1>正距円筒図法 → 地球儀・円形切り抜きツール</h1>
+<div class="small" style="margin-bottom:10px">
+7200×3600（2:1）想定。対象色の既定値は #cc6250。ドラッグで回転、ホイールで拡大縮小。
+</div>
+
+<div class="grid">
+<div>
+  <div class="panel">
+    <h2>1. 入力・対象色</h2>
+    <div class="row"><input type="file" id="fileInput" accept="image/*"></div>
+    <div class="row">
+      <label>取得色 <input type="color" id="targetColor" value="#cc6250"></label>
+      <label>許容差 <input type="range" id="tolerance" min="0" max="120" value="12"><span id="tolValue">12</span></label>
+    </div>
+    <div class="row">
+      <button id="detectBtn">対象色を検出</button>
+      <button id="sampleBtn">プレビューから色取得</button>
+    </div>
+    <canvas id="sourcePreview" width="720" height="360"></canvas>
+    <div class="small">検出後、対象色を橙、選択成分を赤で重ねます。</div>
+  </div>
+
+  <div class="panel">
+    <h2>2. 自動収め</h2>
+    <div class="row">
+      <label>対象
+        <select id="fitMode">
+          <option value="largest">最大成分のみ</option>
+          <option value="selected">選択成分のみ</option>
+          <option value="all">全成分</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>成分 <select id="componentSelect"></select></label>
+    </div>
+    <div class="row">
+      <label>余白率 <input type="range" id="fitMargin" min="0.70" max="0.98" step="0.01" value="0.92"><span id="fitMarginValue">0.92</span></label>
+    </div>
+    <button id="autoFitBtn">自動で収める</button>
+  </div>
+
+  <div class="panel">
+    <h2>3. 手動調整</h2>
+    <div class="row">
+      <label>中心経度 <input type="number" id="centerLon" min="-180" max="180" step="0.1" value="0"></label>
+      <label>中心緯度 <input type="number" id="centerLat" min="-89.9" max="89.9" step="0.1" value="0"></label>
+    </div>
+    <div class="row">
+      <label>拡大率 <input type="range" id="zoom" min="0.5" max="20" step="0.01" value="1"><span id="zoomValue">1.00</span></label>
+    </div>
+    <div class="row">
+      <button id="resetViewBtn">初期化</button>
+      <button id="spinPreviewBtn">回転プレビュー開始/停止</button>
+    </div>
+    <div class="row">
+      <label>回転速度（°/秒） <input type="number" id="spinSpeed" min="-180" max="180" step="1" value="20"></label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>4. 出力</h2>
+    <div class="row">
+      <label>ファイル名 <input type="text" id="fileBase" value="globe"></label>
+    </div>
+    <div class="row">
+      <label>PNGサイズ <input type="number" id="pngSize" min="128" max="4096" step="1" value="1024"></label>
+      <button id="exportPngBtn">PNG出力</button>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="transparentBg" checked> 円外を透明</label>
+      <label>背景色 <input type="color" id="bgColor" value="#ffffff"></label>
+    </div>
+
+    <hr>
+
+    <div class="row">
+      <label>GIFサイズ
+        <select id="gifSize">
+          <option value="256">256</option>
+          <option value="384">384</option>
+          <option value="512" selected>512</option>
+          <option value="640">640</option>
+          <option value="768">768</option>
+          <option value="1024">1024</option>
+        </select>
+      </label>
+      <label>フレーム <input type="number" id="gifFrames" min="8" max="180" value="36"></label>
+    </div>
+    <div class="row">
+      <label>回転角 <input type="number" id="gifDegrees" min="-360" max="360" value="360"></label>
+      <label>遅延ms <input type="number" id="gifDelay" min="10" max="1000" step="10" value="80"></label>
+    </div>
+    <div class="row"><button id="exportGifBtn">回転GIF出力</button></div>
+    <progress id="gifProgress" max="1" value="0"></progress>
+    <div class="small">GIFは256色制限があります。1024px×多数フレームは重くなるので、通常は512px・36フレーム程度を推奨。</div>
+  </div>
+
+  <div class="panel status" id="status">画像を読み込んでください。</div>
+</div>
+
+<div>
+  <div class="panel">
+    <h2>プレビュー</h2>
+    <canvas id="globeCanvas" width="760" height="760"></canvas>
+    <div class="small">正射図法。ドラッグで回転、ホイールで拡大縮小。</div>
+  </div>
+</div>
+</div>
+
+<script type="module">
+import { GIFEncoder, quantize, applyPalette } from "https://cdn.jsdelivr.net/npm/gifenc@1.0.3/dist/gifenc.esm.js";
+
+const $ = id => document.getElementById(id);
+const E = {
+  fileInput:$("fileInput"), targetColor:$("targetColor"), tolerance:$("tolerance"), tolValue:$("tolValue"),
+  detectBtn:$("detectBtn"), sampleBtn:$("sampleBtn"), sourcePreview:$("sourcePreview"),
+  fitMode:$("fitMode"), componentSelect:$("componentSelect"), fitMargin:$("fitMargin"),
+  fitMarginValue:$("fitMarginValue"), autoFitBtn:$("autoFitBtn"),
+  centerLon:$("centerLon"), centerLat:$("centerLat"), zoom:$("zoom"), zoomValue:$("zoomValue"),
+  resetViewBtn:$("resetViewBtn"), spinPreviewBtn:$("spinPreviewBtn"), spinSpeed:$("spinSpeed"),
+  fileBase:$("fileBase"), pngSize:$("pngSize"), exportPngBtn:$("exportPngBtn"),
+  transparentBg:$("transparentBg"), bgColor:$("bgColor"),
+  gifSize:$("gifSize"), gifFrames:$("gifFrames"), gifDegrees:$("gifDegrees"), gifDelay:$("gifDelay"),
+  exportGifBtn:$("exportGifBtn"), gifProgress:$("gifProgress"),
+  globeCanvas:$("globeCanvas"), status:$("status")
+};
+
+const S = {
+  img:null, srcCanvas:document.createElement("canvas"), srcCtx:null, srcData:null, w:0, h:0,
+  detectW:0, detectH:0, detectStep:1, detectMask:null, components:[],
+  lon0:0, lat0:0, zoom:1, sampleMode:false, dragging:false, lastX:0, lastY:0,
+  spin:false, spinRAF:0, spinTs:0, renderQueued:false, exportingGif:false
+};
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const d2r=d=>d*Math.PI/180, r2d=r=>r*180/Math.PI;
+function normLon(l){ while(l<=-180)l+=360; while(l>180)l-=360; return l; }
+function hexRgb(h){h=h.replace("#","");return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)}}
+function setStatus(s){E.status.textContent=s}
+function vec(lat,lon){lat=d2r(lat);lon=d2r(lon);const c=Math.cos(lat);return[c*Math.cos(lon),Math.sin(lat),c*Math.sin(lon)]}
+function ll(x,y,z){const n=Math.hypot(x,y,z)||1;x/=n;y/=n;z/=n;return{lat:r2d(Math.asin(clamp(y,-1,1))),lon:r2d(Math.atan2(z,x))}}
+
+function sync(){
+  E.centerLon.value=S.lon0.toFixed(2); E.centerLat.value=S.lat0.toFixed(2);
+  E.zoom.value=S.zoom.toFixed(2); E.zoomValue.textContent=S.zoom.toFixed(2);
+}
+function view(){return{lon0:S.lon0,lat0:S.lat0,zoom:S.zoom,transparentBg:E.transparentBg.checked,bgColor:E.bgColor.value}}
+function queueRender(){
+  if(S.renderQueued)return; S.renderQueued=true;
+  requestAnimationFrame(()=>{S.renderQueued=false;renderGlobe(E.globeCanvas,view(),E.globeCanvas.width)})
+}
+
+function loadImage(file){
+  if(!file)return;
+  const url=URL.createObjectURL(file), img=new Image();
+  img.onload=()=>{
+    S.img=img;S.w=img.naturalWidth;S.h=img.naturalHeight;
+    S.srcCanvas.width=S.w;S.srcCanvas.height=S.h;
+    S.srcCtx=S.srcCanvas.getContext("2d",{willReadFrequently:true});
+    S.srcCtx.drawImage(img,0,0);S.srcData=S.srcCtx.getImageData(0,0,S.w,S.h);
+    S.components=[];S.detectMask=null;populateComponents();drawSource();
+    S.lon0=0;S.lat0=0;S.zoom=1;sync();queueRender();
+    const ratio=S.w/S.h;
+    setStatus(`画像読込完了: ${S.w}×${S.h}`+(Math.abs(ratio-2)>0.02?`\n注意: 2:1ではありません。`:""));
+    URL.revokeObjectURL(url);
+  };
+  img.onerror=()=>setStatus("画像の読込に失敗しました。");
+  img.src=url;
+}
+
+function drawSource(){
+  const c=E.sourcePreview,x=c.getContext("2d");
+  x.clearRect(0,0,c.width,c.height);
+  if(!S.img){x.fillStyle="#eee";x.fillRect(0,0,c.width,c.height);return}
+  x.drawImage(S.srcCanvas,0,0,c.width,c.height);
+  if(!S.detectMask)return;
+  const o=document.createElement("canvas");o.width=S.detectW;o.height=S.detectH;
+  const ox=o.getContext("2d"),id=ox.createImageData(S.detectW,S.detectH),d=id.data;
+  for(let i=0;i<S.detectMask.length;i++)if(S.detectMask[i]){const p=i*4;d[p]=255;d[p+1]=130;d[p+2]=0;d[p+3]=75}
+  const ci=Number(E.componentSelect.value), comp=S.components[ci];
+  if(comp)for(const cell of comp.cells){const p=cell*4;d[p]=255;d[p+1]=0;d[p+2]=0;d[p+3]=180}
+  ox.putImageData(id,0,0);x.drawImage(o,0,0,c.width,c.height);
+}
+
+function detect(){
+  if(!S.srcData){setStatus("先に画像を読み込んでください。");return}
+  const t=hexRgb(E.targetColor.value),tol=Number(E.tolerance.value),tol2=tol*tol;
+  const step=Math.max(1,Math.round(S.w/1800)),W=Math.ceil(S.w/step),H=Math.ceil(S.h/step);
+  const mask=new Uint8Array(W*H),src=S.srcData.data;
+  for(let sy=0;sy<H;sy++){
+    const y=Math.min(S.h-1,sy*step);
+    for(let sx=0;sx<W;sx++){
+      const x=Math.min(S.w-1,sx*step),p=(y*S.w+x)*4;
+      const dr=src[p]-t.r,dg=src[p+1]-t.g,db=src[p+2]-t.b;
+      if(dr*dr+dg*dg+db*db<=tol2)mask[sy*W+sx]=1;
+    }
+  }
+  const seen=new Uint8Array(W*H),q=new Int32Array(W*H),comps=[];
+  for(let i=0;i<mask.length;i++){
+    if(!mask[i]||seen[i])continue;
+    let head=0,tail=0,sxv=0,syv=0,szv=0,size=0;q[tail++]=i;seen[i]=1;
+    const points=[],cells=[];
+    while(head<tail){
+      const cur=q[head++],cy=(cur/W)|0,cx=cur-cy*W;size++;cells.push(cur);
+      const lon=((cx+.5)/W)*360-180,lat=90-((cy+.5)/H)*180;points.push(lat,lon);
+      const v=vec(lat,lon);sxv+=v[0];syv+=v[1];szv+=v[2];
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(dx===0&&dy===0)continue;
+        let nx=cx+dx,ny=cy+dy;if(ny<0||ny>=H)continue;
+        if(nx<0)nx=W-1; else if(nx>=W)nx=0;
+        const ni=ny*W+nx;if(mask[ni]&&!seen[ni]){seen[ni]=1;q[tail++]=ni}
+      }
+    }
+    const c=ll(sxv,syv,szv);comps.push({size,points,cells,centerLat:c.lat,centerLon:c.lon});
+  }
+  comps.sort((a,b)=>b.size-a.size);
+  S.detectStep=step;S.detectW=W;S.detectH=H;S.detectMask=mask;S.components=comps;
+  populateComponents();drawSource();
+  setStatus(`検出完了: ${comps.length} 成分 / 検出解像度 ${W}×${H} / step=${step}`);
+}
+function populateComponents(){
+  E.componentSelect.innerHTML="";
+  if(!S.components.length){const o=document.createElement("option");o.textContent="（未検出）";E.componentSelect.appendChild(o);return}
+  S.components.forEach((c,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`#${i+1} size=${c.size} center=(${c.centerLat.toFixed(2)}, ${c.centerLon.toFixed(2)})`;E.componentSelect.appendChild(o)});
+  E.componentSelect.value="0";
+}
+function getPoints(){
+  if(!S.components.length)return[];
+  if(E.fitMode.value==="largest")return S.components[0].points.slice();
+  if(E.fitMode.value==="selected"){const c=S.components[Number(E.componentSelect.value)];return c?c.points.slice():[]}
+  const a=[];for(const c of S.components)a.push(...c.points);return a;
+}
+function score(lat0,lon0,p){
+  const ph=d2r(lat0),la=d2r(lon0),sp=Math.sin(ph),cp=Math.cos(ph);let invisible=0,maxR=0;
+  for(let i=0;i<p.length;i+=2){
+    const lat=d2r(p[i]),lon=d2r(p[i+1]),dl=lon-la,sl=Math.sin(lat),cl=Math.cos(lat);
+    const dot=sp*sl+cp*cl*Math.cos(dl);if(dot<0)invisible++;
+    const x=cl*Math.sin(dl),y=cp*sl-sp*cl*Math.cos(dl),r=Math.hypot(x,y);if(r>maxR)maxR=r;
+  }
+  return{invisible,maxR}
+}
+function autoFit(){
+  const p=getPoints();if(!p.length){setStatus("先に対象色を検出してください。");return}
+  let x=0,y=0,z=0;for(let i=0;i<p.length;i+=2){const v=vec(p[i],p[i+1]);x+=v[0];y+=v[1];z+=v[2]}
+  const c=ll(x,y,z);let best={lat:c.lat,lon:c.lon,...score(c.lat,c.lon,p)};
+  for(const step of [30,10,3,1,.3]){
+    let imp=true;while(imp){imp=false;
+      for(const [a,b] of [[step,0],[-step,0],[0,step],[0,-step],[step,step],[step,-step],[-step,step],[-step,-step]]){
+        const lat=clamp(best.lat+a,-89.9,89.9),lon=normLon(best.lon+b),s=score(lat,lon,p);
+        if(s.invisible<best.invisible||(s.invisible===best.invisible&&s.maxR<best.maxR)){best={lat,lon,...s};imp=true}
+      }
+    }
+  }
+  const margin=Number(E.fitMargin.value);S.lat0=best.lat;S.lon0=best.lon;S.zoom=clamp(margin/Math.max(best.maxR,1e-6),.5,20);sync();queueRender();
+  setStatus(`自動収め完了: center=(${best.lat.toFixed(3)}, ${best.lon.toFixed(3)}), zoom=${S.zoom.toFixed(3)}`+(best.invisible?`\n注意: ${best.invisible} 点が裏側です。対象が半球を超えてゐる可能性があります。`:""));
+}
+
+function sampleNearest(u,v){
+  const x=Math.floor((((u%1)+1)%1)*(S.w-1)),y=Math.floor(clamp(v,0,1)*(S.h-1)),p=(y*S.w+x)*4,d=S.srcData.data;
+  return[d[p],d[p+1],d[p+2],d[p+3]];
+}
+function renderGlobe(canvas,v,size){
+  if(!S.srcData)return;
+  canvas.width=size;canvas.height=size;const ctx=canvas.getContext("2d"),id=ctx.createImageData(size,size),d=id.data;
+  const ph0=d2r(v.lat0),la0=d2r(v.lon0),sp0=Math.sin(ph0),cp0=Math.cos(ph0),r=size/2-1,cx=size/2,cy=size/2,bg=hexRgb(v.bgColor);
+  for(let py=0;py<size;py++){
+    const ys=(cy-py)/r;
+    for(let px=0;px<size;px++){
+      const xs=(px-cx)/r,p=(py*size+px)*4;
+      if(xs*xs+ys*ys>1){if(v.transparentBg)d[p+3]=0;else{d[p]=bg.r;d[p+1]=bg.g;d[p+2]=bg.b;d[p+3]=255}continue}
+      const x=xs/v.zoom,y=ys/v.zoom,rho=Math.hypot(x,y);
+      if(rho>1){if(v.transparentBg)d[p+3]=0;else{d[p]=bg.r;d[p+1]=bg.g;d[p+2]=bg.b;d[p+3]=255}continue}
+      let ph,la;
+      if(rho<1e-12){ph=ph0;la=la0}else{
+        const c=Math.asin(rho),sc=Math.sin(c),cc=Math.cos(c);
+        ph=Math.asin(cc*sp0+(y*sc*cp0)/rho);
+        la=la0+Math.atan2(x*sc,rho*cp0*cc-y*sp0*sc);
+      }
+      const u=(la+Math.PI)/(2*Math.PI),vv=(Math.PI/2-ph)/Math.PI,rgba=sampleNearest(u,vv);
+      d[p]=rgba[0];d[p+1]=rgba[1];d[p+2]=rgba[2];d[p+3]=rgba[3];
+    }
+  }
+  ctx.putImageData(id,0,0);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle="rgba(0,0,0,.35)";ctx.lineWidth=1;ctx.stroke();
+}
+function dl(blob,name){
+  const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)
+}
+function cleanBase(){return(E.fileBase.value.trim()||"globe").replace(/[\\/:*?"<>|]+/g,"_")}
+
+function exportPNG(){
+  if(!S.srcData){setStatus("先に画像を読み込んでください。");return}
+  const size=clamp(Number(E.pngSize.value)||1024,128,4096),c=document.createElement("canvas");
+  setStatus(`PNG生成中: ${size}×${size}`);
+  requestAnimationFrame(()=>{renderGlobe(c,view(),size);c.toBlob(b=>{if(!b){setStatus("PNG生成に失敗しました。");return}dl(b,`${cleanBase()}.png`);setStatus(`PNG出力完了: ${size}×${size}`)},"image/png")});
+}
+
+async function exportGIF(){
+  if(!S.srcData){setStatus("先に画像を読み込んでください。");return}
+  if(S.exportingGif)return;
+  S.exportingGif=true;E.exportGifBtn.disabled=true;E.gifProgress.value=0;
+  try{
+    const size=clamp(Number(E.gifSize.value)||512,128,1024),frames=clamp(Number(E.gifFrames.value)||36,2,180);
+    const degrees=Number(E.gifDegrees.value)||360,delay=clamp(Number(E.gifDelay.value)||80,10,1000),base=view();
+    const off=document.createElement("canvas");off.width=size;off.height=size;const ctx=off.getContext("2d",{willReadFrequently:true});
+    const gif=GIFEncoder();
+    for(let i=0;i<frames;i++){
+      const fv={...base,lon0:normLon(base.lon0+degrees*i/frames)};
+      renderGlobe(off,fv,size);
+      const rgba=ctx.getImageData(0,0,size,size).data;
+      let palette,index,opts;
+      if(base.transparentBg){
+        palette=quantize(rgba,256,{format:"rgba4444",oneBitAlpha:true});
+        index=applyPalette(rgba,palette,"rgba4444");
+        let ti=palette.findIndex(c=>c.length>3&&c[3]===0);
+        if(ti<0)ti=0;
+        opts={palette,delay,repeat:0,transparent:true,transparentIndex:ti,dispose:2};
+      }else{
+        palette=quantize(rgba,256,{format:"rgb565"});
+        index=applyPalette(rgba,palette,"rgb565");
+        opts={palette,delay,repeat:0};
+      }
+      gif.writeFrame(index,size,size,opts);
+      E.gifProgress.value=(i+1)/frames;
+      setStatus(`GIFフレーム生成中: ${i+1}/${frames}`);
+      if(i%2===1)await new Promise(r=>setTimeout(r,0));
+    }
+    gif.finish();
+    const bytes=gif.bytes(),blob=new Blob([bytes],{type:"image/gif"});
+    dl(blob,`${cleanBase()}_spin.gif`);
+    setStatus(`GIF出力完了: ${size}×${size} / ${frames}フレーム`);
+  }catch(err){
+    console.error(err);
+    setStatus(`GIF生成エラー:\n${err?.message||err}\n\nネット接続があるか、ブラウザの開発者コンソールも確認してください。`);
+  }finally{
+    S.exportingGif=false;E.exportGifBtn.disabled=false;
+  }
+}
+
+function manual(){
+  S.lon0=normLon(Number(E.centerLon.value)||0);S.lat0=clamp(Number(E.centerLat.value)||0,-89.9,89.9);S.zoom=clamp(Number(E.zoom.value)||1,.5,20);sync();queueRender()
+}
+function spinToggle(){
+  S.spin=!S.spin;
+  if(!S.spin){cancelAnimationFrame(S.spinRAF);S.spinTs=0;setStatus("回転プレビュー停止。");return}
+  setStatus("回転プレビュー開始。");
+  const tick=ts=>{if(!S.spin)return;if(!S.spinTs)S.spinTs=ts;const dt=(ts-S.spinTs)/1000;S.spinTs=ts;S.lon0=normLon(S.lon0+(Number(E.spinSpeed.value)||0)*dt);sync();queueRender();S.spinRAF=requestAnimationFrame(tick)};
+  S.spinRAF=requestAnimationFrame(tick);
+}
+
+E.fileInput.addEventListener("change",e=>loadImage(e.target.files[0]));
+E.tolerance.addEventListener("input",()=>E.tolValue.textContent=E.tolerance.value);
+E.fitMargin.addEventListener("input",()=>E.fitMarginValue.textContent=Number(E.fitMargin.value).toFixed(2));
+E.detectBtn.addEventListener("click",detect);
+E.componentSelect.addEventListener("change",drawSource);
+E.autoFitBtn.addEventListener("click",autoFit);
+E.zoom.addEventListener("input",()=>{S.zoom=clamp(Number(E.zoom.value)||1,.5,20);sync();queueRender()});
+E.centerLon.addEventListener("change",manual);E.centerLat.addEventListener("change",manual);
+E.transparentBg.addEventListener("change",queueRender);E.bgColor.addEventListener("change",queueRender);
+E.resetViewBtn.addEventListener("click",()=>{S.lon0=0;S.lat0=0;S.zoom=1;sync();queueRender();setStatus("視点を初期化しました。")});
+E.spinPreviewBtn.addEventListener("click",spinToggle);
+E.exportPngBtn.addEventListener("click",exportPNG);E.exportGifBtn.addEventListener("click",exportGIF);
+
+E.sampleBtn.addEventListener("click",()=>{if(!S.srcData){setStatus("先に画像を読み込んでください。");return}S.sampleMode=true;setStatus("色取得モード: 元画像プレビューをクリックしてください。")});
+E.sourcePreview.addEventListener("click",e=>{
+  if(!S.sampleMode||!S.srcData)return;
+  const r=E.sourcePreview.getBoundingClientRect(),x=clamp(Math.floor((e.clientX-r.left)/r.width*S.w),0,S.w-1),y=clamp(Math.floor((e.clientY-r.top)/r.height*S.h),0,S.h-1),p=(y*S.w+x)*4,d=S.srcData.data;
+  const hex="#"+[d[p],d[p+1],d[p+2]].map(v=>v.toString(16).padStart(2,"0")).join("");
+  E.targetColor.value=hex;S.sampleMode=false;setStatus(`色を取得しました: ${hex} at (${x}, ${y})`);
+});
+
+E.globeCanvas.addEventListener("mousedown",e=>{S.dragging=true;S.lastX=e.clientX;S.lastY=e.clientY});
+window.addEventListener("mouseup",()=>S.dragging=false);
+window.addEventListener("mousemove",e=>{
+  if(!S.dragging)return;const dx=e.clientX-S.lastX,dy=e.clientY-S.lastY;S.lastX=e.clientX;S.lastY=e.clientY;
+  const f=.25/Math.max(.5,S.zoom);S.lon0=normLon(S.lon0-dx*f);S.lat0=clamp(S.lat0+dy*f,-89.9,89.9);sync();queueRender()
+});
+E.globeCanvas.addEventListener("wheel",e=>{e.preventDefault();S.zoom=clamp(S.zoom*Math.exp(-e.deltaY*.0015),.5,20);sync();queueRender()},{passive:false});
+E.globeCanvas.addEventListener("touchstart",e=>{if(e.touches.length!==1)return;S.dragging=true;S.lastX=e.touches[0].clientX;S.lastY=e.touches[0].clientY},{passive:true});
+E.globeCanvas.addEventListener("touchmove",e=>{
+  if(!S.dragging||e.touches.length!==1)return;const t=e.touches[0],dx=t.clientX-S.lastX,dy=t.clientY-S.lastY;S.lastX=t.clientX;S.lastY=t.clientY;
+  const f=.25/Math.max(.5,S.zoom);S.lon0=normLon(S.lon0-dx*f);S.lat0=clamp(S.lat0+dy*f,-89.9,89.9);sync();queueRender()
+},{passive:true});
+E.globeCanvas.addEventListener("touchend",()=>S.dragging=false);
+
+sync();drawSource();queueRender();
+</script>
+</body>
+</html>

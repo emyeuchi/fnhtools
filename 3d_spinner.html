@@ -35,7 +35,7 @@ code{background:#eee;padding:1px 4px;border-radius:4px}
 <body>
 <header>
   <h1>画像を立体に貼って回転GIF化するツール</h1>
-  <div class="small">Stage 1〜3 実装版。Three.js と gifenc をCDNから読みます。よって初回読込とGIF生成にはネット接続が必要です。</div>
+  <div class="small">Stage 1〜3 実装版。画像はファイル選択・ドラッグ&ドロップ・Ctrl+V貼付けに対応。Three.js と gifenc をCDNから読みます。</div>
 </header>
 <main>
   <section>
@@ -312,10 +312,19 @@ function makeFallbackTexture(){
   updateTextureFromCanvas();
 }
 
-function updateTextureFromCanvas(){
+function updateTextureFromCanvas(recreate = false){
+  // Canvasの寸法を変更した場合はCanvasTextureを作り直す。
+  // 同じCanvasTextureを使ひ回すとGPU側の画像寸法が古いまま残る環境がある。
+  if(recreate && state.texture){
+    state.texture.dispose();
+    state.texture = null;
+  }
   if(!state.texture) {
     state.texture = new THREE.CanvasTexture(state.textureCanvas);
     state.texture.colorSpace = THREE.SRGBColorSpace;
+    state.texture.minFilter = THREE.LinearFilter;
+    state.texture.magFilter = THREE.LinearFilter;
+    state.texture.generateMipmaps = false;
   }
   state.texture.needsUpdate = true;
   applyTextureSettings();
@@ -341,31 +350,49 @@ function applyTextureSettings(){
   }
 }
 
-function loadImageFile(file){
+async function loadImageFile(file){
   if(!file) return;
+  if(!file.type || !file.type.startsWith('image/')){
+    setStatus(`画像ではないファイルです: ${file.name || '(clipboard)'}`);
+    return;
+  }
+  setStatus(`画像を読み込み中… ${file.name || '(clipboard image)'}`);
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    const c = state.textureCanvas, x = state.textureCtx;
-    let w = img.naturalWidth, h = img.naturalHeight;
-    const maxSide = 2048;
-    if(Math.max(w,h) > maxSide){
-      const s = maxSide / Math.max(w,h);
-      w = Math.round(w*s); h = Math.round(h*s);
+    try{
+      const c = state.textureCanvas;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const maxSide = 2048;
+      if(Math.max(w,h) > maxSide){
+        const s = maxSide / Math.max(w,h);
+        w = Math.max(1, Math.round(w*s)); h = Math.max(1, Math.round(h*s));
+      }
+      // canvasのresizeでcontext stateも初期化されるため、resize後にcontextを取り直す。
+      c.width = w; c.height = h;
+      state.textureCtx = c.getContext('2d', { alpha:true });
+      const x = state.textureCtx;
+      x.clearRect(0,0,w,h);
+      if(!UI.transparentBg2d.checked){ x.fillStyle = '#ffffff'; x.fillRect(0,0,w,h); }
+      x.drawImage(img, 0, 0, w, h);
+
+      previewCtx.clearRect(0,0,UI.preview2d.width,UI.preview2d.height);
+      const ratio = Math.min(UI.preview2d.width / w, UI.preview2d.height / h);
+      const dw = w * ratio, dh = h * ratio;
+      previewCtx.drawImage(c, (UI.preview2d.width-dw)/2, (UI.preview2d.height-dh)/2, dw, dh);
+
+      // 画像寸法が変はるたびにTextureを作り直す。
+      updateTextureFromCanvas(true);
+      if(state.objectRoot) buildShape();
+      setStatus(`画像読込完了: ${img.naturalWidth}×${img.naturalHeight} → テクスチャ ${w}×${h}`);
+    }catch(err){
+      console.error(err);
+      setStatus(`画像反映エラー:\n${err?.message || err}`);
+    }finally{
+      URL.revokeObjectURL(url);
     }
-    c.width = w; c.height = h;
-    x.clearRect(0,0,w,h);
-    if(!UI.transparentBg2d.checked){ x.fillStyle = '#ffffff'; x.fillRect(0,0,w,h); }
-    x.drawImage(img, 0, 0, w, h);
-    previewCtx.clearRect(0,0,UI.preview2d.width,UI.preview2d.height);
-    const ratio = Math.min(UI.preview2d.width / w, UI.preview2d.height / h);
-    const dw = w * ratio, dh = h * ratio;
-    previewCtx.drawImage(c, (UI.preview2d.width-dw)/2, (UI.preview2d.height-dh)/2, dw, dh);
-    updateTextureFromCanvas();
-    setStatus(`画像読込完了: ${img.naturalWidth}×${img.naturalHeight}`);
-    URL.revokeObjectURL(url);
   };
-  img.onerror = () => setStatus('画像読込に失敗しました。');
+  img.onerror = () => { URL.revokeObjectURL(url); setStatus('画像読込に失敗しました。'); };
   img.src = url;
 }
 
@@ -837,7 +864,15 @@ async function exportGIF(){
     camera.aspect = 1; camera.updateProjectionMatrix();
     const off = document.createElement('canvas'); off.width = size; off.height = size;
     const ox = off.getContext('2d', { willReadFrequently:true });
-    const { GIFEncoder, quantize, applyPalette } = await import('https://esm.sh/gifenc@1.0.3');
+    // gifencの公式ESM入口を直接読む。CDNのラッパー経由だとdefault exportへ
+    // 包まれて GIFEncoder が関数でなくなる場合があるので、両方のexport形を吸収する。
+    const gifMod = await import('https://cdn.jsdelivr.net/npm/gifenc@1.0.3/src/index.js');
+    const GIFEncoder = gifMod.GIFEncoder ?? gifMod.default?.GIFEncoder;
+    const quantize = gifMod.quantize ?? gifMod.default?.quantize;
+    const applyPalette = gifMod.applyPalette ?? gifMod.default?.applyPalette;
+    if(typeof GIFEncoder !== 'function' || typeof quantize !== 'function' || typeof applyPalette !== 'function'){
+      throw new Error('gifenc のES Moduleを正しく読み込めませんでした。');
+    }
     const gif = GIFEncoder();
     const baseSpin = readNum(UI.spinSpeed,40);
     for(let i=0;i<frames;i++){
@@ -939,6 +974,25 @@ UI.loadConfigBtn.addEventListener('click', loadConfig);
 UI.applyPresetBtn.addEventListener('click', applyPreset);
 UI.preview2d.addEventListener('dragover', e => e.preventDefault());
 UI.preview2d.addEventListener('drop', e => { e.preventDefault(); if(e.dataTransfer.files[0]) loadImageFile(e.dataTransfer.files[0]); });
+
+// 画像ファイルをページ全体へドロップしても読み込める。
+document.addEventListener('dragover', e => {
+  if(e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+  if(e.target === UI.preview2d) return;
+  const f = e.dataTransfer?.files?.[0];
+  if(f && f.type.startsWith('image/')){ e.preventDefault(); loadImageFile(f); }
+});
+
+// Ctrl+V等でクリップボード内の画像を直接貼り付ける。
+document.addEventListener('paste', e => {
+  const items = [...(e.clipboardData?.items || [])];
+  const imageItem = items.find(it => it.type && it.type.startsWith('image/'));
+  if(!imageItem) return;
+  const f = imageItem.getAsFile();
+  if(f){ e.preventDefault(); loadImageFile(f); }
+});
 
 populateShapes();
 updateParamVisibility();

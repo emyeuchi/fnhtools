@@ -490,11 +490,11 @@ async function exportPNG(){
 async function exportGIF(){
   if(state.exportBusy) return; state.exportBusy=true; UI.exportGifBtn.disabled=true; UI.progress.value=0;
   try{
-    const mod = await import('https://esm.sh/gifenc@1.0.3');
-    const GIFEncoder = mod.GIFEncoder || mod.default?.GIFEncoder || mod.default || mod.encoder || mod.GifEncoder;
+    const mod = await import('https://cdn.jsdelivr.net/npm/gifenc@1.0.3/src/index.js');
+    const GIFEncoder = mod.GIFEncoder || mod.default?.GIFEncoder || mod.default;
     const quantize = mod.quantize || mod.default?.quantize;
     const applyPalette = mod.applyPalette || mod.default?.applyPalette;
-    if(typeof GIFEncoder !== 'function' || typeof quantize !== 'function' || typeof applyPalette !== 'function') throw new Error('gifenc の読込に失敗しました。');
+    if(typeof GIFEncoder !== 'function' || typeof quantize !== 'function' || typeof applyPalette !== 'function') throw new Error('gifenc の読み込みに失敗しました。ネット接続を確認してください。');
     const size=clamp(num(UI.gifSize,512),128,1024), frames=clamp(num(UI.gifFrames,36),2,180), delay=clamp(num(UI.gifDelay,80),10,1000);
     const oldW=state.renderer.domElement.width, oldH=state.renderer.domElement.height; state.renderer.setSize(size,size,false); state.camera.aspect=1; state.camera.updateProjectionMatrix(); state.fxCanvas.width=size; state.fxCanvas.height=size;
     const gif=GIFEncoder();

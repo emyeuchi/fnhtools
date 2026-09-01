@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image 3D Spinner Chaos Edition</title>
+<style>
+:root{--bg:#fff;--panel:#f7f7f7;--bd:#ccc;--txt:#222;--sub:#666;font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif}
+body{margin:0;color:var(--txt);background:var(--bg)}
+header{padding:14px 16px;border-bottom:1px solid #ddd}
+h1{font-size:20px;margin:0 0 4px} small,.small{font-size:12px;color:var(--sub)}
+main{display:grid;grid-template-columns:440px 1fr;gap:16px;padding:16px}
+@media(max-width:1100px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:7px 0}
+label{font-size:13px;display:inline-flex;align-items:center;gap:6px}
+input,select,button,textarea{font-size:13px}
+input[type="number"],input[type="text"],select,button{padding:5px 7px}
+input[type="range"]{width:130px}
+button{cursor:pointer}
+#viewerWrap{background:#f0f0f0;border:1px solid var(--bd);border-radius:8px;padding:8px;min-height:740px}
+#viewer{width:100%;height:740px;border-radius:4px;overflow:hidden;background:#fff;position:relative}
+#fxCanvas{position:absolute;inset:0;pointer-events:none;display:none}
+#texPreview,#objPreview{border:1px solid #bbb;background:#fff;max-width:100%}
+.status{white-space:pre-wrap;min-height:2em;font-size:13px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.layerbox,.deformbox{border:1px solid #ddd;border-radius:6px;padding:8px;background:#fff;margin-top:8px}
+.tabbar{display:flex;gap:6px;flex-wrap:wrap}.tabbar button.active{font-weight:700;border-color:#888}
+hr{border:none;border-top:1px solid #ddd;margin:10px 0} progress{width:100%}
+.hidden{display:none!important}
+.codeish{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Image 3D Spinner — Chaos Edition</h1>
+  <div class="small">複数オブジェクト、複数テクスチャレイヤー、ブレンドモード、UVアニメ、変形スタック、簡易ポストエフェクト、GIF出力つき初版。</div>
+</header>
+<main>
+<section>
+  <div class="panel">
+    <h2>0. 全体</h2>
+    <div class="row">
+      <label>設定名 <input type="text" id="fileBase" value="chaos"></label>
+      <button id="saveCfgBtn">設定保存</button>
+      <button id="loadCfgBtn">設定復元</button>
+      <button id="presetChaosBtn">カオスプリセット</button>
+    </div>
+    <div class="row"><canvas id="texPreview" width="256" height="256"></canvas><canvas id="objPreview" width="256" height="256"></canvas></div>
+    <div class="small">左は選択中オブジェクトの合成テクスチャ、右は選択中オブジェクトの入力画像プレビュー。</div>
+  </div>
+
+  <div class="panel">
+    <h2>1. オブジェクト</h2>
+    <div class="row tabbar" id="objectTabs"></div>
+    <div class="row">
+      <label>形状 <select id="shape"></select></label>
+      <label>表示 <input type="checkbox" id="objVisible" checked></label>
+      <label>透明マテリアル <input type="checkbox" id="objTransparent" checked></label>
+    </div>
+    <div class="cols2">
+      <div>
+        <div class="row"><label>位置X <input type="number" id="posX" step="0.1" value="0"></label><label>Y <input type="number" id="posY" step="0.1" value="0"></label><label>Z <input type="number" id="posZ" step="0.1" value="0"></label></div>
+        <div class="row"><label>回転X <input type="number" id="rotX" step="1" value="0"></label><label>Y <input type="number" id="rotY" step="1" value="0"></label><label>Z <input type="number" id="rotZ" step="1" value="0"></label></div>
+        <div class="row"><label>尺度X <input type="number" id="scaleX" step="0.1" value="1"></label><label>Y <input type="number" id="scaleY" step="0.1" value="1"></label><label>Z <input type="number" id="scaleZ" step="0.1" value="1"></label></div>
+      </div>
+      <div>
+        <div class="row"><label>sizeA <input type="number" id="sizeA" step="0.05" value="1"></label><label>sizeB <input type="number" id="sizeB" step="0.05" value="0.35"></label></div>
+        <div class="row"><label>sizeC <input type="number" id="sizeC" step="0.05" value="2"></label><label>detail <input type="number" id="detail" step="1" value="48"></label></div>
+        <div class="row"><label>色 <input type="color" id="baseColor" value="#ffffff"></label><label>金属 <input type="number" id="metalness" step="0.05" min="0" max="1" value="0.1"></label><label>粗さ <input type="number" id="roughness" step="0.05" min="0" max="1" value="0.8"></label></div>
+      </div>
+    </div>
+    <div class="row"><button id="applyObjBtn">オブジェクト再構築</button><button id="cloneObjBtn">選択設定を他へ複製</button></div>
+  </div>
+
+  <div class="panel">
+    <h2>2. テクスチャレイヤー</h2>
+    <div class="row tabbar" id="layerTabs"></div>
+    <div class="row">
+      <input type="file" id="layerFile" accept="image/*">
+      <button id="clearLayerBtn">このレイヤーをクリア</button>
+      <button id="genNoiseBtn">ノイズ生成</button>
+      <button id="genStripeBtn">縞生成</button>
+      <button id="genGridBtn">グリッド生成</button>
+      <button id="genTextBtn">TEXT生成</button>
+    </div>
+    <div class="row">
+      <label>有効 <input type="checkbox" id="layerEnabled" checked></label>
+      <label>blend <select id="blendMode"></select></label>
+      <label>opacity <input type="range" id="layerOpacity" min="0" max="1" step="0.01" value="1"><span id="layerOpacityVal">1.00</span></label>
+    </div>
+    <div class="row">
+      <label>repeatX <input type="number" id="repX" step="0.1" value="1"></label>
+      <label>repeatY <input type="number" id="repY" step="0.1" value="1"></label>
+      <label>offsetX <input type="number" id="offX" step="0.01" value="0"></label>
+      <label>offsetY <input type="number" id="offY" step="0.01" value="0"></label>
+      <label>rot° <input type="number" id="uvRot" step="1" value="0"></label>
+    </div>
+    <div class="row">
+      <label>scrollX/sec <input type="number" id="scrollX" step="0.01" value="0"></label>
+      <label>scrollY/sec <input type="number" id="scrollY" step="0.01" value="0"></label>
+      <label>rotSpeed°/sec <input type="number" id="rotSpeed" step="1" value="0"></label>
+    </div>
+    <div class="row">
+      <label>effect <select id="texEffect"></select></label>
+      <label>strength <input type="number" id="texEffectStrength" step="0.05" value="0.3"></label>
+      <label>色調 <select id="colorFilter"></select></label>
+    </div>
+    <div class="small">レイヤーは最大4枚。合成モードは <span class="codeish">source-over / multiply / screen / overlay / lighten / darken / difference / exclusion / color-dodge / hard-light / soft-light</span> など。</div>
+  </div>
+
+  <div class="panel">
+    <h2>3. 変形スタック</h2>
+    <div class="row tabbar" id="deformTabs"></div>
+    <div class="row">
+      <label>有効 <input type="checkbox" id="deformEnabled"></label>
+      <label>mode <select id="deformMode"></select></label>
+      <label>strength <input type="number" id="deformStrength" step="0.05" value="0.25"></label>
+      <label>speed <input type="number" id="deformSpeed" step="0.05" value="1"></label>
+      <label>freq <input type="number" id="deformFreq" step="0.1" value="3"></label>
+    </div>
+    <div class="small">最大4スロット。順番に重ね掛けします。</div>
+  </div>
+
+  <div class="panel">
+    <h2>4. 自動アニメーション</h2>
+    <div class="row"><label>回転モード <select id="spinMode"><option value="spin">spin</option><option value="swing">swing</option><option value="none">none</option></select></label><label>軸 <select id="spinAxis"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option><option value="xy">XY</option><option value="yz">YZ</option><option value="xyz">XYZ</option></select></label><label>速度 <input type="number" id="spinSpeed" value="30" step="1"></label><label>振幅° <input type="number" id="spinAmp" value="35" step="1"></label></div>
+    <div class="row"><label>公転 <input type="checkbox" id="orbitEnabled"></label><label>半径 <input type="number" id="orbitRadius" step="0.1" value="0"></label><label>速度°/sec <input type="number" id="orbitSpeed" step="1" value="20"></label></div>
+    <div class="row"><label>浮遊 <input type="checkbox" id="bobEnabled"></label><label>量 <input type="number" id="bobAmount" step="0.01" value="0.1"></label><label>周期秒 <input type="number" id="bobPeriod" step="0.1" value="2"></label></div>
+    <div class="row"><label>拍動 <input type="checkbox" id="pulseEnabled"></label><label>量 <input type="number" id="pulseAmount" step="0.01" value="0.08"></label><label>周期秒 <input type="number" id="pulsePeriod" step="0.1" value="1.5"></label></div>
+    <div class="row"><label>ランダム揺れ <input type="checkbox" id="jitterEnabled"></label><label>量 <input type="number" id="jitterAmount" step="0.01" value="0.03"></label></div>
+  </div>
+
+  <div class="panel">
+    <h2>5. シーン・ポスト</h2>
+    <div class="row"><label>背景透明 <input type="checkbox" id="sceneTransparent" checked></label><label>背景色 <input type="color" id="bgColor" value="#ffffff"></label></div>
+    <div class="row"><label>環境光 <input type="number" id="ambient" step="0.1" value="1.1"></label><label>主光 <input type="number" id="dir" step="0.1" value="1.6"></label><label>ライト周回 <input type="checkbox" id="lightOrbit"></label><label>速度 <input type="number" id="lightOrbitSpeed" step="1" value="25"></label></div>
+    <div class="row"><label>カメラ距離 <input type="number" id="camDist" step="0.1" value="5"></label><label>FOV <input type="number" id="camFov" step="1" value="35"></label><label>カメラロール° <input type="number" id="camRoll" step="1" value="0"></label></div>
+    <hr>
+    <div class="row"><label>FX有効 <input type="checkbox" id="fxEnabled"></label><label>RGB shift <input type="number" id="fxRgbShift" step="1" value="2"></label><label>pixelate <input type="number" id="fxPixelate" step="1" value="1"></label><label>scanline <input type="number" id="fxScanline" step="1" value="0"></label></div>
+    <div class="row"><label>noise <input type="number" id="fxNoise" step="0.01" value="0"></label><label>ghost trail <input type="number" id="fxTrail" step="0.01" value="0"></label><label>invert <input type="checkbox" id="fxInvert"></label><label>posterize <input type="number" id="fxPosterize" step="1" value="0"></label></div>
+    <div class="row"><label>glitch <input type="number" id="fxGlitch" step="1" value="0"></label></div>
+    <div class="row"><button id="applySceneBtn">シーン更新</button></div>
+  </div>
+
+  <div class="panel">
+    <h2>6. 出力</h2>
+    <div class="row"><label>PNG size <input type="number" id="pngSize" value="1024" min="128" max="4096" step="1"></label><button id="exportPngBtn">PNG出力</button></div>
+    <div class="row"><label>GIF size <input type="number" id="gifSize" value="512" min="128" max="1024" step="1"></label><label>frames <input type="number" id="gifFrames" value="36" min="2" max="180" step="1"></label><label>delay ms <input type="number" id="gifDelay" value="80" min="10" max="1000" step="10"></label></div>
+    <div class="row"><button id="exportGifBtn">GIF出力</button></div>
+    <progress id="progress" max="1" value="0"></progress>
+  </div>
+
+  <div class="panel status" id="status">準備完了。</div>
+</section>
+<section>
+  <div id="viewerWrap"><div id="viewer"><canvas id="fxCanvas"></canvas></div></div>
+</section>
+</main>
+
+<script type="module">
+import * as THREE from 'https://esm.sh/three@0.165.0';
+
+const $ = id => document.getElementById(id);
+const UI = Object.fromEntries([
+  'fileBase','saveCfgBtn','loadCfgBtn','presetChaosBtn','texPreview','objPreview','shape','objVisible','objTransparent','posX','posY','posZ','rotX','rotY','rotZ','scaleX','scaleY','scaleZ','sizeA','sizeB','sizeC','detail','baseColor','metalness','roughness','applyObjBtn','cloneObjBtn','objectTabs','layerTabs','layerFile','clearLayerBtn','genNoiseBtn','genStripeBtn','genGridBtn','genTextBtn','layerEnabled','blendMode','layerOpacity','layerOpacityVal','repX','repY','offX','offY','uvRot','scrollX','scrollY','rotSpeed','texEffect','texEffectStrength','colorFilter','deformTabs','deformEnabled','deformMode','deformStrength','deformSpeed','deformFreq','spinMode','spinAxis','spinSpeed','spinAmp','orbitEnabled','orbitRadius','orbitSpeed','bobEnabled','bobAmount','bobPeriod','pulseEnabled','pulseAmount','pulsePeriod','jitterEnabled','jitterAmount','sceneTransparent','bgColor','ambient','dir','lightOrbit','lightOrbitSpeed','camDist','camFov','camRoll','fxEnabled','fxRgbShift','fxPixelate','fxScanline','fxNoise','fxTrail','fxInvert','fxPosterize','fxGlitch','applySceneBtn','pngSize','gifSize','gifFrames','gifDelay','exportPngBtn','exportGifBtn','progress','status','fxCanvas'
+].map(k=>[k,$(k)]));
+const texPrev = UI.texPreview.getContext('2d');
+const objPrev = UI.objPreview.getContext('2d');
+const STORE='chaos_spinner_cfg_v1';
+function setStatus(s){ UI.status.textContent=s; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function deg(v){ return v*Math.PI/180; }
+function cleanBase(){ return (UI.fileBase.value.trim()||'chaos').replace(/[\\/:*?"<>|]+/g,'_'); }
+function num(el, d=0){ const v=Number(el.value); return Number.isFinite(v)?v:d; }
+function bool(el){ return !!el.checked; }
+function makeCanvas(w=512,h=512){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+function randSeed(x){ return Math.sin(x*9999.13)*43758.5453 % 1; }
+
+const BLENDS=['source-over','multiply','screen','overlay','lighten','darken','difference','exclusion','hard-light','soft-light','color-dodge','color-burn'];
+const TEX_EFFECTS=['none','invert','threshold','posterize','solarize','rgbshift','kaleido','polar','waveuv'];
+const COLOR_FILTERS=['none','grayscale','sepia','huerotate','duotone'];
+const DEFORMS=['none','waveX','waveY','waveZ','twistY','twistX','bulge','noise','spike','melt'];
+const SHAPES=['sphere','cube','box','cylinder','cone','torus','torusKnot','plane','disc','ring','icosahedron','octahedron','dodecahedron','tetrahedron','capsuleLike','latheEgg','latheDrop','starPrism','nPrism','nPyramid','ribbon','tube'];
+for(const a of BLENDS){ const o=document.createElement('option'); o.value=a; o.textContent=a; UI.blendMode.appendChild(o); }
+for(const a of TEX_EFFECTS){ const o=document.createElement('option'); o.value=a; o.textContent=a; UI.texEffect.appendChild(o); }
+for(const a of COLOR_FILTERS){ const o=document.createElement('option'); o.value=a; o.textContent=a; UI.colorFilter.appendChild(o); }
+for(const a of DEFORMS){ const o=document.createElement('option'); o.value=a; o.textContent=a; UI.deformMode.appendChild(o); }
+for(const a of SHAPES){ const o=document.createElement('option'); o.value=a; o.textContent=a; UI.shape.appendChild(o); }
+
+const state={
+  selectedObject:0, selectedLayer:0, selectedDeform:0,
+  objects:[],
+  renderer:null, scene:null, camera:null, ambient:null, dir:null, back:null,
+  viewer:null, fxCanvas:UI.fxCanvas, fxCtx:UI.fxCanvas.getContext('2d'), trailCanvas:makeCanvas(1,1), trailCtx:null,
+  start:performance.now(), exportBusy:false
+};
+state.trailCtx = state.trailCanvas.getContext('2d');
+state.viewer = $('viewer');
+
+function defaultLayer(){ return { enabled:false, opacity:1, blend:'source-over', repX:1, repY:1, offX:0, offY:0, uvRot:0, scrollX:0, scrollY:0, rotSpeed:0, effect:'none', effectStrength:0.3, colorFilter:'none', sourceType:'empty', image:null, sourceCanvas:makeCanvas(512,512), composed:null }; }
+function defaultDeform(){ return { enabled:false, mode:'none', strength:0.25, speed:1, freq:3 }; }
+function defaultObject(i){ return {
+  visible:true, transparent:true, shape:i===0?'sphere':(i===1?'torus':'cube'),
+  posX:(i-1)*1.7,posY:0,posZ:0,rotX:0,rotY:0,rotZ:0,scaleX:1,scaleY:1,scaleZ:1,
+  sizeA:1,sizeB:0.35,sizeC:2,detail:48,baseColor:'#ffffff',metalness:0.1,roughness:0.8,
+  spinMode:'spin',spinAxis:i===1?'xyz':'y',spinSpeed:20+i*8,spinAmp:35,orbitEnabled:false,orbitRadius:0,orbitSpeed:20,bobEnabled:false,bobAmount:0.1,bobPeriod:2,pulseEnabled:false,pulseAmount:0.08,pulsePeriod:1.5,jitterEnabled:false,jitterAmount:0.03,
+  layers:[defaultLayer(),defaultLayer(),defaultLayer(),defaultLayer()], deforms:[defaultDeform(),defaultDeform(),defaultDeform(),defaultDeform()],
+  texCanvas:makeCanvas(1024,1024), texCtx:null, texPreviewCanvas:makeCanvas(256,256), texture:null,
+  group:null, mesh:null, material:null, basePositions:null
+}; }
+for(let i=0;i<3;i++){ const o=defaultObject(i); o.texCtx=o.texCanvas.getContext('2d'); state.objects.push(o); }
+
+function initTabs(){
+  UI.objectTabs.innerHTML='';
+  for(let i=0;i<3;i++){ const b=document.createElement('button'); b.textContent='Object '+(i+1); b.onclick=()=>{ state.selectedObject=i; refreshObjectUI(); refreshLayerUI(); refreshDeformUI(); refreshAllPreviews(); updateTabActives(); }; UI.objectTabs.appendChild(b); }
+  UI.layerTabs.innerHTML='';
+  for(let i=0;i<4;i++){ const b=document.createElement('button'); b.textContent='Layer '+(i+1); b.onclick=()=>{ state.selectedLayer=i; refreshLayerUI(); updateTabActives(); }; UI.layerTabs.appendChild(b); }
+  UI.deformTabs.innerHTML='';
+  for(let i=0;i<4;i++){ const b=document.createElement('button'); b.textContent='Deform '+(i+1); b.onclick=()=>{ state.selectedDeform=i; refreshDeformUI(); updateTabActives(); }; UI.deformTabs.appendChild(b); }
+  updateTabActives();
+}
+function updateTabActives(){
+  [...UI.objectTabs.children].forEach((b,i)=>b.classList.toggle('active',i===state.selectedObject));
+  [...UI.layerTabs.children].forEach((b,i)=>b.classList.toggle('active',i===state.selectedLayer));
+  [...UI.deformTabs.children].forEach((b,i)=>b.classList.toggle('active',i===state.selectedDeform));
+}
+
+function initThree(){
+  state.renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true });
+  state.viewer.prepend(state.renderer.domElement);
+  state.scene = new THREE.Scene();
+  state.camera = new THREE.PerspectiveCamera(35,1,0.1,100);
+  state.camera.position.set(0,0,5);
+  state.ambient = new THREE.AmbientLight(0xffffff,1.1); state.scene.add(state.ambient);
+  state.dir = new THREE.DirectionalLight(0xffffff,1.6); state.dir.position.set(3,2,5); state.scene.add(state.dir);
+  state.back = new THREE.DirectionalLight(0xffffff,0.4); state.back.position.set(-3,-2,-5); state.scene.add(state.back);
+  resize(); window.addEventListener('resize',resize);
+  state.trailCanvas.width=state.viewer.clientWidth||700; state.trailCanvas.height=state.viewer.clientHeight||700;
+}
+function resize(){
+  const w=state.viewer.clientWidth||700, h=state.viewer.clientHeight||700;
+  state.renderer.setSize(w,h,false); state.camera.aspect=w/h; state.camera.updateProjectionMatrix();
+  state.fxCanvas.width=w; state.fxCanvas.height=h; state.fxCanvas.style.width='100%'; state.fxCanvas.style.height='100%';
+  if(state.trailCanvas.width!==w||state.trailCanvas.height!==h){ state.trailCanvas.width=w; state.trailCanvas.height=h; }
+}
+
+function makeFallbackInto(layer, label='Object'){ const c=layer.sourceCanvas, x=c.getContext('2d'); c.width=512; c.height=512; x.clearRect(0,0,512,512); x.fillStyle='#fff'; x.fillRect(0,0,512,512); x.fillStyle='#2563eb'; x.fillRect(30,150,452,210); x.strokeStyle='#111'; x.lineWidth=10; x.strokeRect(30,150,452,210); x.fillStyle='#111'; x.font='bold 48px sans-serif'; x.fillText(label, 150, 110); x.fillStyle='#fff'; x.font='bold 120px sans-serif'; x.fillText('3D', 170, 295); x.fillStyle='#666'; x.font='24px sans-serif'; x.fillText('Drop / Paste / Upload image', 105, 420); layer.enabled=true; layer.sourceType='generated'; layer.image=null; }
+
+function refreshObjectUI(){
+  const o=state.objects[state.selectedObject];
+  UI.shape.value=o.shape; UI.objVisible.checked=o.visible; UI.objTransparent.checked=o.transparent;
+  for(const k of ['posX','posY','posZ','rotX','rotY','rotZ','scaleX','scaleY','scaleZ','sizeA','sizeB','sizeC','detail','metalness','roughness','spinSpeed','spinAmp','orbitRadius','orbitSpeed','bobAmount','bobPeriod','pulseAmount','pulsePeriod','jitterAmount']) UI[k].value=o[k];
+  UI.baseColor.value=o.baseColor;
+  for(const k of ['orbitEnabled','bobEnabled','pulseEnabled','jitterEnabled']) UI[k].checked=o[k];
+  UI.spinMode.value=o.spinMode; UI.spinAxis.value=o.spinAxis;
+}
+function applyObjectFromUI(){
+  const o=state.objects[state.selectedObject];
+  Object.assign(o,{ shape:UI.shape.value, visible:bool(UI.objVisible), transparent:bool(UI.objTransparent), baseColor:UI.baseColor.value, spinMode:UI.spinMode.value, spinAxis:UI.spinAxis.value });
+  for(const k of ['posX','posY','posZ','rotX','rotY','rotZ','scaleX','scaleY','scaleZ','sizeA','sizeB','sizeC','detail','metalness','roughness','spinSpeed','spinAmp','orbitRadius','orbitSpeed','bobAmount','bobPeriod','pulseAmount','pulsePeriod','jitterAmount']) o[k]=num(UI[k],o[k]);
+  for(const k of ['orbitEnabled','bobEnabled','pulseEnabled','jitterEnabled']) o[k]=bool(UI[k]);
+  buildObject(state.selectedObject);
+}
+function cloneCurrentObjectSettings(){
+  const src=JSON.parse(JSON.stringify(serializeObject(state.objects[state.selectedObject])));
+  state.objects.forEach((o,i)=>{ if(i===state.selectedObject) return; const oldLayers=o.layers; const oldTexCanvas=o.texCanvas; const oldTexCtx=o.texCtx; const rebuilt=deserializeObject(src, i); state.objects[i]=rebuilt; state.objects[i].layers.forEach((L,j)=>{ if(oldLayers[j]?.sourceCanvas){ L.sourceCanvas=oldLayers[j].sourceCanvas; L.image=oldLayers[j].image; } }); if(oldTexCanvas){ state.objects[i].texCanvas=oldTexCanvas; state.objects[i].texCtx=oldTexCtx; } buildObject(i); });
+  setStatus('選択オブジェクト設定を他へ複製しました。');
+}
+
+function refreshLayerUI(){
+  const L=state.objects[state.selectedObject].layers[state.selectedLayer];
+  UI.layerEnabled.checked=L.enabled; UI.blendMode.value=L.blend; UI.layerOpacity.value=L.opacity; UI.layerOpacityVal.textContent=Number(L.opacity).toFixed(2);
+  for(const k of ['repX','repY','offX','offY','uvRot','scrollX','scrollY','rotSpeed','texEffectStrength']) UI[k].value=L[k];
+  UI.texEffect.value=L.effect; UI.colorFilter.value=L.colorFilter;
+  drawObjPreview();
+}
+function applyLayerFromUI(){
+  const L=state.objects[state.selectedObject].layers[state.selectedLayer];
+  Object.assign(L,{ enabled:bool(UI.layerEnabled), blend:UI.blendMode.value, opacity:num(UI.layerOpacity,1), repX:num(UI.repX,1), repY:num(UI.repY,1), offX:num(UI.offX,0), offY:num(UI.offY,0), uvRot:num(UI.uvRot,0), scrollX:num(UI.scrollX,0), scrollY:num(UI.scrollY,0), rotSpeed:num(UI.rotSpeed,0), effect:UI.texEffect.value, effectStrength:num(UI.texEffectStrength,0.3), colorFilter:UI.colorFilter.value });
+  composeTexture(state.selectedObject, currentTime());
+}
+function clearLayer(){ const L=state.objects[state.selectedObject].layers[state.selectedLayer]; L.enabled=false; L.image=null; L.sourceType='empty'; const x=L.sourceCanvas.getContext('2d'); x.clearRect(0,0,L.sourceCanvas.width,L.sourceCanvas.height); refreshLayerUI(); composeTexture(state.selectedObject,currentTime()); }
+
+function refreshDeformUI(){
+  const D=state.objects[state.selectedObject].deforms[state.selectedDeform];
+  UI.deformEnabled.checked=D.enabled; UI.deformMode.value=D.mode; UI.deformStrength.value=D.strength; UI.deformSpeed.value=D.speed; UI.deformFreq.value=D.freq;
+}
+function applyDeformFromUI(){
+  const D=state.objects[state.selectedObject].deforms[state.selectedDeform];
+  Object.assign(D,{ enabled:bool(UI.deformEnabled), mode:UI.deformMode.value, strength:num(UI.deformStrength,0.25), speed:num(UI.deformSpeed,1), freq:num(UI.deformFreq,3) });
+}
+
+function drawObjPreview(){
+  const L=state.objects[state.selectedObject].layers[state.selectedLayer];
+  objPrev.clearRect(0,0,256,256); objPrev.fillStyle='#fff'; objPrev.fillRect(0,0,256,256);
+  const sc=L.sourceCanvas; if(!sc) return; const ratio=Math.min(256/sc.width,256/sc.height); const w=sc.width*ratio,h=sc.height*ratio; objPrev.drawImage(sc,(256-w)/2,(256-h)/2,w,h);
+}
+function drawTexPreview(objIdx=state.selectedObject){
+  const o=state.objects[objIdx], c=o.texCanvas; texPrev.clearRect(0,0,256,256); texPrev.fillStyle='#fff'; texPrev.fillRect(0,0,256,256); const r=Math.min(256/c.width,256/c.height); const w=c.width*r,h=c.height*r; texPrev.drawImage(c,(256-w)/2,(256-h)/2,w,h);
+}
+function refreshAllPreviews(){ drawObjPreview(); drawTexPreview(); }
+
+function applyColorFilterToContext(ctx, filter, w, h, strength=0.5){
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  for(let i=0;i<d.length;i+=4){
+    let r=d[i], g=d[i+1], b=d[i+2];
+    if(filter==='grayscale'){ const y=0.299*r+0.587*g+0.114*b; r=g=b=y; }
+    else if(filter==='sepia'){ const nr=clamp(0.393*r+0.769*g+0.189*b,0,255), ng=clamp(0.349*r+0.686*g+0.168*b,0,255), nb=clamp(0.272*r+0.534*g+0.131*b,0,255); r=nr; g=ng; b=nb; }
+    else if(filter==='huerotate'){ const ang=strength*Math.PI*2; const cs=Math.cos(ang), sn=Math.sin(ang); const nr=(0.213+cs*0.787-sn*0.213)*r+(0.715-cs*0.715-sn*0.715)*g+(0.072-cs*0.072+sn*0.928)*b; const ng=(0.213-cs*0.213+sn*0.143)*r+(0.715+cs*0.285+sn*0.140)*g+(0.072-cs*0.072-sn*0.283)*b; const nb=(0.213-cs*0.213-sn*0.787)*r+(0.715-cs*0.715+sn*0.715)*g+(0.072+cs*0.928+sn*0.072)*b; r=nr; g=ng; b=nb; }
+    else if(filter==='duotone'){ const y=(0.299*r+0.587*g+0.114*b)/255; r=40+y*180; g=20+y*100; b=80+y*150; }
+    d[i]=clamp(r,0,255); d[i+1]=clamp(g,0,255); d[i+2]=clamp(b,0,255);
+  }
+  ctx.putImageData(id,0,0);
+}
+function applyTextureEffect(canvas, effect, strength=0.3){
+  if(effect==='none') return canvas;
+  const c=makeCanvas(canvas.width, canvas.height), x=c.getContext('2d'); x.drawImage(canvas,0,0);
+  const w=c.width,h=c.height;
+  if(effect==='invert' || effect==='threshold' || effect==='posterize' || effect==='solarize' || effect==='rgbshift'){
+    const id=x.getImageData(0,0,w,h), d=id.data;
+    if(effect==='invert') for(let i=0;i<d.length;i+=4){ d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; }
+    if(effect==='threshold'){ const th=strength*255; for(let i=0;i<d.length;i+=4){ const y=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; const v=y>=th?255:0; d[i]=d[i+1]=d[i+2]=v; } }
+    if(effect==='posterize'){ const lv=Math.max(2,Math.round(2+strength*10)); const step=255/(lv-1); for(let i=0;i<d.length;i+=4){ d[i]=Math.round(d[i]/step)*step; d[i+1]=Math.round(d[i+1]/step)*step; d[i+2]=Math.round(d[i+2]/step)*step; } }
+    if(effect==='solarize'){ const th=128+strength*80; for(let i=0;i<d.length;i+=4){ if(d[i]>th)d[i]=255-d[i]; if(d[i+1]>th)d[i+1]=255-d[i+1]; if(d[i+2]>th)d[i+2]=255-d[i+2]; } }
+    if(effect==='rgbshift'){
+      const src=new Uint8ClampedArray(d), shift=Math.max(1,Math.round(1+strength*12));
+      for(let y=0;y<h;y++)for(let x0=0;x0<w;x0++){
+        const i=(y*w+x0)*4;
+        const xr=clamp(x0+shift,0,w-1), xb=clamp(x0-shift,0,w-1);
+        d[i]=src[(y*w+xr)*4]; d[i+1]=src[i+1]; d[i+2]=src[(y*w+xb)*4+2];
+      }
+    }
+    x.putImageData(id,0,0); return c;
+  }
+  if(effect==='kaleido'){
+    const src=makeCanvas(w,h), sx=src.getContext('2d'); sx.drawImage(c,0,0); x.clearRect(0,0,w,h); x.save(); x.translate(w/2,h/2);
+    const slices=Math.max(4,Math.round(4+strength*12)); const ang=Math.PI*2/slices;
+    for(let i=0;i<slices;i++){
+      x.save(); x.rotate(i*ang); x.beginPath(); x.moveTo(0,0); x.arc(0,0,Math.max(w,h),-ang/2,ang/2); x.closePath(); x.clip(); if(i%2)x.scale(-1,1); x.drawImage(src,-w/2,-h/2,w,h); x.restore();
+    }
+    x.restore(); return c;
+  }
+  if(effect==='polar'){
+    const src=makeCanvas(w,h), sx=src.getContext('2d'); sx.drawImage(c,0,0); x.clearRect(0,0,w,h); const sid=sx.getImageData(0,0,w,h).data; const od=x.createImageData(w,h), dd=od.data;
+    const cx=w/2, cy=h/2, maxR=Math.min(cx,cy);
+    for(let py=0;py<h;py++)for(let px=0;px<w;px++){
+      const dx=px-cx, dy=py-cy, ang=(Math.atan2(dy,dx)+Math.PI)/(Math.PI*2), r=Math.hypot(dx,dy)/maxR; const sxp=clamp(Math.floor(ang*(w-1)),0,w-1), syp=clamp(Math.floor(r*(h-1)),0,h-1); const si=(syp*w+sxp)*4, di=(py*w+px)*4; dd[di]=sid[si]; dd[di+1]=sid[si+1]; dd[di+2]=sid[si+2]; dd[di+3]=sid[si+3]; }
+    x.putImageData(od,0,0); return c;
+  }
+  if(effect==='waveuv'){
+    const src=makeCanvas(w,h), sx=src.getContext('2d'); sx.drawImage(c,0,0); const sid=sx.getImageData(0,0,w,h).data; const od=x.createImageData(w,h), dd=od.data; const amp=Math.max(2,Math.round(strength*20));
+    for(let py=0;py<h;py++)for(let px=0;px<w;px++){
+      const sy=clamp(Math.floor(py + Math.sin(px/18)*amp),0,h-1), sxp=px; const si=(sy*w+sxp)*4, di=(py*w+px)*4; dd[di]=sid[si]; dd[di+1]=sid[si+1]; dd[di+2]=sid[si+2]; dd[di+3]=sid[si+3]; }
+    x.putImageData(od,0,0); return c;
+  }
+  return c;
+}
+
+function composeTexture(objIdx, t){
+  const o=state.objects[objIdx], c=o.texCanvas, x=o.texCtx; x.clearRect(0,0,c.width,c.height); x.fillStyle='rgba(0,0,0,0)'; x.fillRect(0,0,c.width,c.height);
+  for(const L of o.layers){
+    if(!L.enabled || !L.sourceCanvas) continue;
+    const tmp=makeCanvas(c.width,c.height), tx=tmp.getContext('2d');
+    const source = applyTextureEffect(L.sourceCanvas, L.effect, L.effectStrength);
+    const repX=L.repX||1, repY=L.repY||1; const baseW=c.width/repX, baseH=c.height/repY;
+    tx.save(); tx.translate(c.width/2,c.height/2);
+    const ox=(L.offX + (L.scrollX||0)*t)*c.width, oy=(L.offY + (L.scrollY||0)*t)*c.height; tx.translate(ox, oy);
+    tx.rotate(deg((L.uvRot||0) + (L.rotSpeed||0)*t)); tx.translate(-c.width/2,-c.height/2);
+    for(let ix=-1; ix<=Math.ceil(repX)+1; ix++) for(let iy=-1; iy<=Math.ceil(repY)+1; iy++) tx.drawImage(source, ix*baseW, iy*baseH, baseW, baseH);
+    tx.restore();
+    if(L.colorFilter!=='none') applyColorFilterToContext(tx, L.colorFilter, c.width, c.height, L.effectStrength);
+    x.save(); x.globalAlpha=L.opacity; x.globalCompositeOperation=L.blend; x.drawImage(tmp,0,0); x.restore();
+  }
+  if(!o.texture){ o.texture = new THREE.CanvasTexture(c); o.texture.colorSpace = THREE.SRGBColorSpace; }
+  o.texture.needsUpdate = true;
+  if(o.material){ o.material.map=o.texture; o.material.color.set(o.baseColor); o.material.transparent=o.transparent; o.material.needsUpdate=true; }
+  drawTexPreview(objIdx);
+}
+
+function makeGeometry(o){
+  const a=o.sizeA,b=o.sizeB,c=o.sizeC,d=Math.max(3,Math.round(o.detail));
+  switch(o.shape){
+    case 'sphere': return new THREE.SphereGeometry(a,d,Math.max(8,Math.round(d/2)));
+    case 'cube': return new THREE.BoxGeometry(a,a,a,10,10,10);
+    case 'box': return new THREE.BoxGeometry(a,b||a,c||a,10,10,10);
+    case 'cylinder': return new THREE.CylinderGeometry(a,a,c,d,12,false);
+    case 'cone': return new THREE.ConeGeometry(a,c,d,12,false);
+    case 'torus': return new THREE.TorusGeometry(a,b||0.3,Math.max(6,Math.round(d/2)),Math.max(12,d*2));
+    case 'torusKnot': return new THREE.TorusKnotGeometry(a,b||0.25,Math.max(64,d*4),Math.max(6,Math.round(d/2)),2,3);
+    case 'plane': return new THREE.PlaneGeometry(c,a,Math.max(8,Math.round(d/2)),Math.max(8,Math.round(d/3)));
+    case 'disc': return new THREE.CylinderGeometry(a,a,b||0.08,d,1,false);
+    case 'ring': return new THREE.RingGeometry(Math.max(0.01,b),a,d);
+    case 'icosahedron': return new THREE.IcosahedronGeometry(a,Math.min(3,Math.round(b)));
+    case 'octahedron': return new THREE.OctahedronGeometry(a,Math.min(3,Math.round(b)));
+    case 'dodecahedron': return new THREE.DodecahedronGeometry(a,Math.min(3,Math.round(b)));
+    case 'tetrahedron': return new THREE.TetrahedronGeometry(a,Math.min(3,Math.round(b)));
+    case 'capsuleLike': return new THREE.CapsuleGeometry(Math.max(0.05,a),Math.max(0.05,c),8,16);
+    case 'latheEgg': { const pts=[]; for(let i=0;i<=32;i++){ const t=i/32, y=(t-0.5)*c; const r=a*(0.7+0.4*t)*Math.sin(Math.PI*t); pts.push(new THREE.Vector2(Math.max(0.001,r),y)); } return new THREE.LatheGeometry(pts, d); }
+    case 'latheDrop': { const pts=[]; for(let i=0;i<=32;i++){ const t=i/32, y=(t-0.5)*c; const r=a*Math.pow(Math.sin(Math.PI*t),0.8)*(1.2-0.6*t); pts.push(new THREE.Vector2(Math.max(0.001,r),y)); } return new THREE.LatheGeometry(pts, d); }
+    case 'starPrism': { const shape=new THREE.Shape(); const outer=a, inner=Math.max(0.05,b), points=Math.max(5,Math.round(c||5)); for(let i=0;i<points*2;i++){ const r=i%2===0?outer:inner; const ang=-Math.PI/2+i*Math.PI/points; const x=Math.cos(ang)*r,y=Math.sin(ang)*r; if(i===0)shape.moveTo(x,y); else shape.lineTo(x,y);} shape.closePath(); const g=new THREE.ExtrudeGeometry(shape,{depth:0.4,bevelEnabled:true,bevelThickness:0.04,bevelSize:0.04,bevelSegments:2}); g.center(); return g; }
+    case 'nPrism': return new THREE.CylinderGeometry(a,a,c,Math.max(3,Math.round(b||6)),1,false);
+    case 'nPyramid': return new THREE.CylinderGeometry(0.001,a,c,Math.max(3,Math.round(b||6)),1,false);
+    case 'ribbon': { const seg=Math.max(24,d); const geo=new THREE.PlaneGeometry(c,a,seg,1); const pos=geo.attributes.position; for(let i=0;i<pos.count;i++){ const x=pos.getX(i); pos.setZ(i, Math.sin((x/c)*Math.PI*4)*(b||0.2)); } pos.needsUpdate=true; geo.computeVertexNormals(); return geo; }
+    case 'tube': {
+      const pts=[new THREE.Vector3(-c/2,-a/4,0),new THREE.Vector3(-c/4,a/3,b),new THREE.Vector3(c/4,-a/3,-b),new THREE.Vector3(c/2,a/4,0)];
+      const curve=new THREE.CatmullRomCurve3(pts); return new THREE.TubeGeometry(curve,Math.max(40,d*2),Math.max(0.03,a*0.2),Math.max(6,Math.round(d/3)),false);
+    }
+    default: return new THREE.SphereGeometry(a,48,24);
+  }
+}
+function buildObject(idx){
+  const o=state.objects[idx];
+  if(o.group){ state.scene.remove(o.group); o.group.traverse(n=>{ if(n.geometry) n.geometry.dispose?.(); if(n.material) n.material.dispose?.(); }); }
+  const group=new THREE.Group();
+  const geo=makeGeometry(o); const mat=new THREE.MeshStandardMaterial({ map:o.texture||null, color:o.baseColor, transparent:o.transparent, metalness:o.metalness, roughness:o.roughness, side:THREE.DoubleSide });
+  const mesh=new THREE.Mesh(geo,mat); group.add(mesh); state.scene.add(group); o.group=group; o.mesh=mesh; o.material=mat; o.basePositions=geo.attributes.position.array.slice();
+  composeTexture(idx,currentTime());
+}
+
+function currentTime(){ return (performance.now()-state.start)/1000; }
+function applyDeforms(o, t){
+  if(!o.mesh) return; const pos=o.mesh.geometry.attributes.position; if(!pos || !o.basePositions) return; const arr=pos.array, base=o.basePositions;
+  for(let i=0;i<arr.length;i++) arr[i]=base[i];
+  for(const D of o.deforms){ if(!D.enabled || D.mode==='none') continue; const phase=t*D.speed*Math.PI*2; for(let i=0;i<arr.length;i+=3){ let x=arr[i],y=arr[i+1],z=arr[i+2]; const bx=x,by=y,bz=z; const s=D.strength, f=D.freq; switch(D.mode){ case 'waveX': z += Math.sin(x*f + phase)*s; break; case 'waveY': z += Math.sin(y*f + phase)*s; break; case 'waveZ': y += Math.sin(z*f + phase)*s; break; case 'twistY': { const a=y*s+phase*0.15; x=bx*Math.cos(a)-bz*Math.sin(a); z=bx*Math.sin(a)+bz*Math.cos(a);} break; case 'twistX': { const a=x*s+phase*0.15; y=by*Math.cos(a)-bz*Math.sin(a); z=by*Math.sin(a)+bz*Math.cos(a);} break; case 'bulge': { const r=Math.hypot(bx,by,bz)||1; const k=1+Math.sin(r*f+phase)*s*0.3; x*=k;y*=k;z*=k;} break; case 'noise': { const n=Math.sin(bx*12.3+by*7.7+bz*5.1+phase)*s*0.5; x+=n; y+=n*0.8; z+=n*0.7; } break; case 'spike': { const r=Math.hypot(bx,by,bz)||1; const k=1+s*Math.max(0,Math.sin((bx+by+bz)*f+phase)); x*=k;y*=k;z*=k; } break; case 'melt': y -= Math.max(0,Math.sin(bx*f+phase))*s*0.5*(by+1); break; }
+      arr[i]=x; arr[i+1]=y; arr[i+2]=z; }
+  }
+  pos.needsUpdate=true; o.mesh.geometry.computeVertexNormals();
+}
+function applyObjectTransform(o, idx, t){
+  if(!o.group) return;
+  o.group.visible = o.visible;
+  o.group.position.set(o.posX,o.posY,o.posZ);
+  o.group.scale.set(o.scaleX,o.scaleY,o.scaleZ);
+  o.group.rotation.set(deg(o.rotX),deg(o.rotY),deg(o.rotZ));
+  if(o.spinMode==='spin'){
+    const a=deg(o.spinSpeed*t); if(o.spinAxis==='x')o.group.rotation.x+=a; else if(o.spinAxis==='y')o.group.rotation.y+=a; else if(o.spinAxis==='z')o.group.rotation.z+=a; else if(o.spinAxis==='xy'){o.group.rotation.x+=a*0.8; o.group.rotation.y+=a;} else if(o.spinAxis==='yz'){o.group.rotation.y+=a*0.8; o.group.rotation.z+=a;} else {o.group.rotation.x+=a*0.6;o.group.rotation.y+=a;o.group.rotation.z+=a*0.35;}
+  } else if(o.spinMode==='swing'){
+    const a=deg(Math.sin(t*o.spinSpeed/25)*o.spinAmp); if(o.spinAxis==='x')o.group.rotation.x+=a; else if(o.spinAxis==='y')o.group.rotation.y+=a; else if(o.spinAxis==='z')o.group.rotation.z+=a; else if(o.spinAxis==='xy'){o.group.rotation.x+=a*0.7;o.group.rotation.y+=a;} else if(o.spinAxis==='yz'){o.group.rotation.y+=a*0.7;o.group.rotation.z+=a;} else {o.group.rotation.x+=a*0.4;o.group.rotation.y+=a;o.group.rotation.z+=a*0.25;}
+  }
+  if(o.orbitEnabled && o.orbitRadius!==0){ const a=deg(o.orbitSpeed*t); o.group.position.x += Math.cos(a)*o.orbitRadius; o.group.position.z += Math.sin(a)*o.orbitRadius; }
+  if(o.bobEnabled){ o.group.position.y += Math.sin(t/Math.max(0.1,o.bobPeriod)*Math.PI*2)*o.bobAmount; }
+  if(o.pulseEnabled){ const s=1+Math.sin(t/Math.max(0.1,o.pulsePeriod)*Math.PI*2)*o.pulseAmount; o.group.scale.multiplyScalar(s); }
+  if(o.jitterEnabled){ o.group.position.x += (Math.sin(t*17+idx*7)*0.5+Math.sin(t*29+idx)*0.5)*o.jitterAmount; o.group.position.y += (Math.sin(t*23+idx*3)*0.5)*o.jitterAmount; }
+}
+
+function updateScene(){
+  state.camera.position.set(0,0,num(UI.camDist,5)); state.camera.fov=clamp(num(UI.camFov,35),10,100); state.camera.updateProjectionMatrix(); state.camera.rotation.z=deg(num(UI.camRoll,0));
+  state.ambient.intensity=num(UI.ambient,1.1); state.dir.intensity=num(UI.dir,1.6); state.back.intensity=Math.max(0,state.dir.intensity*0.25);
+  if(bool(UI.sceneTransparent)) state.renderer.setClearColor(0x000000,0); else state.renderer.setClearColor(UI.bgColor.value,1);
+}
+
+function applyPostFX(){
+  const enabled=bool(UI.fxEnabled); UI.fxCanvas.style.display=enabled?'block':'none'; if(!enabled) return;
+  const w=state.fxCanvas.width,h=state.fxCanvas.height, x=state.fxCtx; x.clearRect(0,0,w,h);
+  const src=state.renderer.domElement;
+  const pix=Math.max(1,Math.round(num(UI.fxPixelate,1)));
+  if(pix>1){ const tw=Math.max(1,Math.floor(w/pix)), th=Math.max(1,Math.floor(h/pix)); const tmp=makeCanvas(tw,th), tx=tmp.getContext('2d'); tx.drawImage(src,0,0,tw,th); x.imageSmoothingEnabled=false; x.drawImage(tmp,0,0,w,h); x.imageSmoothingEnabled=true; }
+  else x.drawImage(src,0,0,w,h);
+  if(num(UI.fxTrail,0)>0){ const alpha=clamp(num(UI.fxTrail,0),0,0.95); state.trailCtx.globalCompositeOperation='source-over'; state.trailCtx.globalAlpha=1-alpha; state.trailCtx.drawImage(state.trailCanvas,0,0); state.trailCtx.globalAlpha=alpha; state.trailCtx.drawImage(state.fxCanvas,0,0); x.clearRect(0,0,w,h); x.drawImage(state.trailCanvas,0,0); }
+  let id=x.getImageData(0,0,w,h), d=id.data;
+  const rgbShift=Math.round(num(UI.fxRgbShift,2));
+  if(rgbShift>0){ const srcd=new Uint8ClampedArray(d); for(let y=0;y<h;y++) for(let x0=0;x0<w;x0++){ const i=(y*w+x0)*4; const xr=clamp(x0+rgbShift,0,w-1), xb=clamp(x0-rgbShift,0,w-1); d[i]=srcd[(y*w+xr)*4]; d[i+2]=srcd[(y*w+xb)*4+2]; } }
+  const poster=Math.round(num(UI.fxPosterize,0)); if(poster>1){ const step=255/(poster-1); for(let i=0;i<d.length;i+=4){ d[i]=Math.round(d[i]/step)*step; d[i+1]=Math.round(d[i+1]/step)*step; d[i+2]=Math.round(d[i+2]/step)*step; } }
+  const noise=num(UI.fxNoise,0); if(noise>0){ for(let i=0;i<d.length;i+=4){ const n=(Math.random()-0.5)*255*noise; d[i]=clamp(d[i]+n,0,255); d[i+1]=clamp(d[i+1]+n,0,255); d[i+2]=clamp(d[i+2]+n,0,255);} }
+  if(bool(UI.fxInvert)){ for(let i=0;i<d.length;i+=4){ d[i]=255-d[i]; d[i+1]=255-d[i+1]; d[i+2]=255-d[i+2]; } }
+  const glitch=Math.round(num(UI.fxGlitch,0)); if(glitch>0){ for(let k=0;k<glitch;k++){ const y=Math.floor(Math.random()*h), gh=Math.max(1,Math.floor(Math.random()*12)); const shift=(Math.random()*40-20)|0; for(let yy=y; yy<Math.min(h,y+gh); yy++){ const row=yy*w*4; const copy=d.slice(row,row+w*4); for(let xx=0; xx<w; xx++){ const sx=clamp(xx+shift,0,w-1), si=sx*4, di=row+xx*4; d[di]=copy[si]; d[di+1]=copy[si+1]; d[di+2]=copy[si+2]; d[di+3]=copy[si+3]; } } } }
+  x.putImageData(id,0,0);
+  const scan=Math.round(num(UI.fxScanline,0)); if(scan>0){ x.fillStyle='rgba(0,0,0,0.12)'; for(let y=0;y<h;y+=Math.max(2,scan)) x.fillRect(0,y,w,1); }
+}
+
+function renderAt(t){
+  for(let i=0;i<state.objects.length;i++){ const o=state.objects[i]; composeTexture(i,t); applyDeforms(o,t); applyObjectTransform(o,i,t); }
+  if(bool(UI.lightOrbit)){ const a=deg(num(UI.lightOrbitSpeed,25)*t); state.dir.position.set(Math.cos(a)*4,2.2,Math.sin(a)*4); }
+  state.renderer.render(state.scene,state.camera);
+  applyPostFX();
+}
+function loop(now){ const t=(now-state.start)/1000; renderAt(t); requestAnimationFrame(loop); }
+
+function captureCanvasForExport(){
+  if(bool(UI.fxEnabled)){ const c=makeCanvas(state.fxCanvas.width,state.fxCanvas.height); c.getContext('2d').drawImage(state.fxCanvas,0,0); return c; }
+  const c=makeCanvas(state.renderer.domElement.width,state.renderer.domElement.height); c.getContext('2d').drawImage(state.renderer.domElement,0,0); return c;
+}
+
+async function exportPNG(){
+  const oldW=state.renderer.domElement.width, oldH=state.renderer.domElement.height; const size=clamp(num(UI.pngSize,1024),128,4096); state.renderer.setSize(size,size,false); state.camera.aspect=1; state.camera.updateProjectionMatrix(); state.fxCanvas.width=size; state.fxCanvas.height=size; renderAt(currentTime()); const cap=captureCanvasForExport(); const blob=await new Promise(r=>cap.toBlob(r,'image/png')); downloadBlob(blob, cleanBase()+'.png'); resize(); updateScene(); setStatus(`PNG出力完了: ${size}×${size}`);
+}
+
+async function exportGIF(){
+  if(state.exportBusy) return; state.exportBusy=true; UI.exportGifBtn.disabled=true; UI.progress.value=0;
+  try{
+    const mod = await import('https://esm.sh/gifenc@1.0.3');
+    const GIFEncoder = mod.GIFEncoder || mod.default?.GIFEncoder || mod.default || mod.encoder || mod.GifEncoder;
+    const quantize = mod.quantize || mod.default?.quantize;
+    const applyPalette = mod.applyPalette || mod.default?.applyPalette;
+    if(typeof GIFEncoder !== 'function' || typeof quantize !== 'function' || typeof applyPalette !== 'function') throw new Error('gifenc の読込に失敗しました。');
+    const size=clamp(num(UI.gifSize,512),128,1024), frames=clamp(num(UI.gifFrames,36),2,180), delay=clamp(num(UI.gifDelay,80),10,1000);
+    const oldW=state.renderer.domElement.width, oldH=state.renderer.domElement.height; state.renderer.setSize(size,size,false); state.camera.aspect=1; state.camera.updateProjectionMatrix(); state.fxCanvas.width=size; state.fxCanvas.height=size;
+    const gif=GIFEncoder();
+    const off=makeCanvas(size,size), ox=off.getContext('2d',{willReadFrequently:true});
+    for(let i=0;i<frames;i++){
+      const t=i/frames * (360/Math.max(1,num(UI.spinSpeed,30))); renderAt(t); const cap=captureCanvasForExport(); ox.clearRect(0,0,size,size); ox.drawImage(cap,0,0,size,size); const rgba=ox.getImageData(0,0,size,size).data;
+      let palette,index,opts; if(bool(UI.sceneTransparent)) { palette=quantize(rgba,256,{format:'rgba4444',oneBitAlpha:true}); index=applyPalette(rgba,palette,'rgba4444'); let ti=palette.findIndex(c=>c.length>3&&c[3]===0); if(ti<0) ti=0; opts={palette,delay,repeat:0,transparent:true,transparentIndex:ti,dispose:2}; } else { palette=quantize(rgba,256,{format:'rgb565'}); index=applyPalette(rgba,palette,'rgb565'); opts={palette,delay,repeat:0}; }
+      gif.writeFrame(index,size,size,opts); UI.progress.value=(i+1)/frames; setStatus(`GIFフレーム生成中: ${i+1}/${frames}`); if(i%2===1) await new Promise(r=>setTimeout(r,0));
+    }
+    gif.finish(); const bytes=gif.bytes(); downloadBlob(new Blob([bytes],{type:'image/gif'}), cleanBase()+'_spin.gif'); resize(); updateScene(); setStatus(`GIF出力完了: ${size}px / ${frames}フレーム`);
+  } catch(err){ console.error(err); setStatus('GIF生成エラー: '+(err?.message||err)); }
+  finally { state.exportBusy=false; UI.exportGifBtn.disabled=false; }
+}
+function downloadBlob(blob,name){ const u=URL.createObjectURL(blob), a=document.createElement('a'); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),1500); }
+
+function serializeLayer(L){ return { enabled:L.enabled, opacity:L.opacity, blend:L.blend, repX:L.repX, repY:L.repY, offX:L.offX, offY:L.offY, uvRot:L.uvRot, scrollX:L.scrollX, scrollY:L.scrollY, rotSpeed:L.rotSpeed, effect:L.effect, effectStrength:L.effectStrength, colorFilter:L.colorFilter, sourceType:L.sourceType, dataURL:L.sourceCanvas ? L.sourceCanvas.toDataURL('image/png') : null }; }
+function serializeObject(o){ return { visible:o.visible, transparent:o.transparent, shape:o.shape, posX:o.posX,posY:o.posY,posZ:o.posZ,rotX:o.rotX,rotY:o.rotY,rotZ:o.rotZ,scaleX:o.scaleX,scaleY:o.scaleY,scaleZ:o.scaleZ,sizeA:o.sizeA,sizeB:o.sizeB,sizeC:o.sizeC,detail:o.detail,baseColor:o.baseColor,metalness:o.metalness,roughness:o.roughness,spinMode:o.spinMode,spinAxis:o.spinAxis,spinSpeed:o.spinSpeed,spinAmp:o.spinAmp,orbitEnabled:o.orbitEnabled,orbitRadius:o.orbitRadius,orbitSpeed:o.orbitSpeed,bobEnabled:o.bobEnabled,bobAmount:o.bobAmount,bobPeriod:o.bobPeriod,pulseEnabled:o.pulseEnabled,pulseAmount:o.pulseAmount,pulsePeriod:o.pulsePeriod,jitterEnabled:o.jitterEnabled,jitterAmount:o.jitterAmount,layers:o.layers.map(serializeLayer),deforms:o.deforms.map(d=>({...d})) }; }
+function deserializeLayer(src){ const L=defaultLayer(); Object.assign(L, src); if(src.dataURL){ const img=new Image(); img.onload=()=>{ L.sourceCanvas.width=img.naturalWidth; L.sourceCanvas.height=img.naturalHeight; L.sourceCanvas.getContext('2d').drawImage(img,0,0); composeTexture(state.selectedObject,currentTime()); refreshAllPreviews(); }; img.src=src.dataURL; } return L; }
+function deserializeObject(src, idx){ const o=defaultObject(idx); Object.assign(o, src); o.layers=src.layers.map(deserializeLayer); o.deforms=src.deforms.map(d=>Object.assign(defaultDeform(), d)); o.texCanvas=makeCanvas(1024,1024); o.texCtx=o.texCanvas.getContext('2d'); return o; }
+function saveCfg(){ const payload={ objects:state.objects.map(serializeObject), selectedObject:state.selectedObject, selectedLayer:state.selectedLayer, selectedDeform:state.selectedDeform, scene:{ sceneTransparent:bool(UI.sceneTransparent), bgColor:UI.bgColor.value, ambient:UI.ambient.value, dir:UI.dir.value, lightOrbit:bool(UI.lightOrbit), lightOrbitSpeed:UI.lightOrbitSpeed.value, camDist:UI.camDist.value, camFov:UI.camFov.value, camRoll:UI.camRoll.value, fxEnabled:bool(UI.fxEnabled), fxRgbShift:UI.fxRgbShift.value, fxPixelate:UI.fxPixelate.value, fxScanline:UI.fxScanline.value, fxNoise:UI.fxNoise.value, fxTrail:UI.fxTrail.value, fxInvert:bool(UI.fxInvert), fxPosterize:UI.fxPosterize.value, fxGlitch:UI.fxGlitch.value, fileBase:UI.fileBase.value } }; localStorage.setItem(STORE, JSON.stringify(payload)); setStatus('設定を保存しました。'); }
+function loadCfg(){ const raw=localStorage.getItem(STORE); if(!raw){ setStatus('保存済み設定がありません。'); return; } try{ const payload=JSON.parse(raw); state.objects=payload.objects.map((o,i)=>deserializeObject(o,i)); state.selectedObject=payload.selectedObject||0; state.selectedLayer=payload.selectedLayer||0; state.selectedDeform=payload.selectedDeform||0; const s=payload.scene||{}; for(const k in s){ if(UI[k]){ if(typeof UI[k].checked==='boolean' && typeof s[k]==='boolean') UI[k].checked=s[k]; else UI[k].value=s[k]; } } rebuildAll(); refreshObjectUI(); refreshLayerUI(); refreshDeformUI(); refreshAllPreviews(); updateTabActives(); updateScene(); setStatus('設定を復元しました。'); } catch(err){ console.error(err); setStatus('設定の復元に失敗しました。'); } }
+
+function rebuildAll(){ for(let i=0;i<state.objects.length;i++) buildObject(i); }
+
+function generatePattern(kind){ const L=state.objects[state.selectedObject].layers[state.selectedLayer]; const c=L.sourceCanvas, x=c.getContext('2d'); c.width=512; c.height=512; x.clearRect(0,0,512,512); x.fillStyle='rgba(255,255,255,0)'; x.fillRect(0,0,512,512);
+  if(kind==='noise'){ const id=x.createImageData(512,512), d=id.data; for(let i=0;i<d.length;i+=4){ const v=Math.floor(Math.random()*256); d[i]=v; d[i+1]=(v+Math.random()*80)|0; d[i+2]=(255-v); d[i+3]=255; } x.putImageData(id,0,0); }
+  if(kind==='stripe'){ x.fillStyle='#fff'; x.fillRect(0,0,512,512); for(let i=0;i<20;i++){ x.fillStyle=`hsl(${(i*18)%360} 80% 55%)`; x.fillRect(i*26,0,16,512); } }
+  if(kind==='grid'){ x.fillStyle='#fff'; x.fillRect(0,0,512,512); x.strokeStyle='#111'; x.lineWidth=2; for(let i=0;i<=16;i++){ x.beginPath(); x.moveTo(i*32,0); x.lineTo(i*32,512); x.stroke(); x.beginPath(); x.moveTo(0,i*32); x.lineTo(512,i*32); x.stroke(); } }
+  if(kind==='text'){ x.fillStyle='#fff'; x.fillRect(0,0,512,512); x.fillStyle='#111'; x.font='bold 72px sans-serif'; x.fillText('CHAOS', 90, 180); x.fillStyle='#e11d48'; x.font='bold 120px sans-serif'; x.fillText('!!!', 165, 320); x.fillStyle='#2563eb'; x.font='bold 36px sans-serif'; x.fillText('MULTI LAYER', 115, 420); }
+  L.enabled=true; L.sourceType='generated'; refreshLayerUI(); composeTexture(state.selectedObject,currentTime());
+}
+function readImageIntoLayer(file){ if(!file) return; const L=state.objects[state.selectedObject].layers[state.selectedLayer]; const url=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{ L.sourceCanvas.width=img.naturalWidth; L.sourceCanvas.height=img.naturalHeight; const x=L.sourceCanvas.getContext('2d'); x.clearRect(0,0,L.sourceCanvas.width,L.sourceCanvas.height); x.drawImage(img,0,0); L.enabled=true; L.image=img; L.sourceType='file'; refreshLayerUI(); composeTexture(state.selectedObject,currentTime()); URL.revokeObjectURL(url); setStatus(`画像読込完了: ${img.naturalWidth}×${img.naturalHeight}`); }; img.onerror=()=>setStatus('画像読込に失敗しました。'); img.src=url; }
+function handlePaste(ev){ const items=[...(ev.clipboardData?.items||[])]; const item=items.find(i=>i.type.startsWith('image/')); if(item){ const file=item.getAsFile(); if(file){ readImageIntoLayer(file); setStatus('クリップボード画像を読込みました。'); } } }
+function handleDrop(ev){ ev.preventDefault(); const file=ev.dataTransfer?.files?.[0]; if(file) readImageIntoLayer(file); }
+
+function chaosPreset(){
+  const o1=state.objects[0],o2=state.objects[1],o3=state.objects[2];
+  Object.assign(o1,{shape:'sphere',sizeA:1,spinAxis:'y',spinSpeed:25,bobEnabled:true,bobAmount:0.08});
+  Object.assign(o2,{shape:'torusKnot',sizeA:0.9,sizeB:0.22,spinAxis:'xyz',spinSpeed:32,posX:1.8,posZ:0,pulseEnabled:true,pulseAmount:0.06});
+  Object.assign(o3,{shape:'cube',sizeA:1.2,spinAxis:'xy',spinSpeed:18,posX:-1.8,jitterEnabled:true,jitterAmount:0.02});
+  for(const [i,o] of [o1,o2,o3].entries()){
+    o.layers.forEach(L=>{ Object.assign(L, defaultLayer()); });
+    makeFallbackInto(o.layers[0],'Object '+(i+1)); o.layers[0].enabled=true;
+    generatePatternForObject(i,1,'grid'); o.layers[1].blend='multiply'; o.layers[1].opacity=0.35; o.layers[1].repX=2; o.layers[1].repY=2;
+    generatePatternForObject(i,2,'stripe'); o.layers[2].blend='screen'; o.layers[2].opacity=0.25; o.layers[2].rotSpeed=20; o.layers[2].scrollX=0.03;
+    generatePatternForObject(i,3,'noise'); o.layers[3].blend='overlay'; o.layers[3].opacity=0.2; o.layers[3].effect='rgbshift';
+    o.deforms[0]={enabled:true,mode:i===0?'bulge':'waveX',strength:0.18,speed:1,freq:3};
+    o.deforms[1]={enabled:i===1,mode:'twistY',strength:0.25,speed:1,freq:2};
+    o.deforms[2]={enabled:i===2,mode:'noise',strength:0.10,speed:1.2,freq:4};
+    o.deforms[3]=defaultDeform();
+  }
+  UI.fxEnabled.checked=true; UI.fxRgbShift.value=2; UI.fxNoise.value=0.03; UI.fxScanline.value=4; UI.fxGlitch.value=2; UI.sceneTransparent.checked=true; UI.lightOrbit.checked=true;
+  rebuildAll(); refreshObjectUI(); refreshLayerUI(); refreshDeformUI(); refreshAllPreviews(); updateScene(); setStatus('カオスプリセットを適用しました。');
+}
+function generatePatternForObject(objIdx, layerIdx, kind){ const prevO=state.selectedObject, prevL=state.selectedLayer; state.selectedObject=objIdx; state.selectedLayer=layerIdx; generatePattern(kind); state.selectedObject=prevO; state.selectedLayer=prevL; }
+
+// events
+UI.layerOpacity.addEventListener('input',()=>{ UI.layerOpacityVal.textContent=Number(UI.layerOpacity.value).toFixed(2); applyLayerFromUI(); });
+UI.applyObjBtn.onclick=applyObjectFromUI; UI.cloneObjBtn.onclick=cloneCurrentObjectSettings; UI.layerFile.onchange=e=>readImageIntoLayer(e.target.files[0]); UI.clearLayerBtn.onclick=clearLayer; UI.genNoiseBtn.onclick=()=>generatePattern('noise'); UI.genStripeBtn.onclick=()=>generatePattern('stripe'); UI.genGridBtn.onclick=()=>generatePattern('grid'); UI.genTextBtn.onclick=()=>generatePattern('text'); UI.deformEnabled.onchange=applyDeformFromUI; UI.deformMode.onchange=applyDeformFromUI; UI.deformStrength.onchange=applyDeformFromUI; UI.deformSpeed.onchange=applyDeformFromUI; UI.deformFreq.onchange=applyDeformFromUI;
+for(const id of ['layerEnabled','blendMode','repX','repY','offX','offY','uvRot','scrollX','scrollY','rotSpeed','texEffect','texEffectStrength','colorFilter']) UI[id].addEventListener('change',applyLayerFromUI);
+for(const id of ['shape','objVisible','objTransparent','posX','posY','posZ','rotX','rotY','rotZ','scaleX','scaleY','scaleZ','sizeA','sizeB','sizeC','detail','baseColor','metalness','roughness','spinMode','spinAxis','spinSpeed','spinAmp','orbitEnabled','orbitRadius','orbitSpeed','bobEnabled','bobAmount','bobPeriod','pulseEnabled','pulseAmount','pulsePeriod','jitterEnabled','jitterAmount']) UI[id].addEventListener('change',applyObjectFromUI);
+for(const id of ['sceneTransparent','bgColor','ambient','dir','lightOrbit','lightOrbitSpeed','camDist','camFov','camRoll','fxEnabled','fxRgbShift','fxPixelate','fxScanline','fxNoise','fxTrail','fxInvert','fxPosterize','fxGlitch']) UI[id].addEventListener('change',updateScene);
+UI.applySceneBtn.onclick=updateScene; UI.exportPngBtn.onclick=exportPNG; UI.exportGifBtn.onclick=exportGIF; UI.saveCfgBtn.onclick=saveCfg; UI.loadCfgBtn.onclick=loadCfg; UI.presetChaosBtn.onclick=chaosPreset;
+document.addEventListener('paste',handlePaste); window.addEventListener('dragover',e=>e.preventDefault()); window.addEventListener('drop',handleDrop);
+
+initTabs(); initThree();
+state.objects.forEach((o,i)=>makeFallbackInto(o.layers[0],'Object '+(i+1)));
+rebuildAll(); refreshObjectUI(); refreshLayerUI(); refreshDeformUI(); refreshAllPreviews(); updateScene();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

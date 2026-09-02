@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>塑史世界の歩き方｜国別ページジェネレータ</title>
+<style>
+:root{--accent:#7430a5;--paper:#fff;--ink:#111;--wash:#fffed0;--ui:#f4f1f7;--line:#d9d1df;--scale:1}
+*{box-sizing:border-box}body{margin:0;background:#d9d6dd;color:#222;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.app{display:grid;grid-template-columns:370px minmax(0,1fr);min-height:100vh}.panel{position:sticky;top:0;height:100vh;overflow:auto;background:var(--ui);border-right:1px solid #c8c1ce;padding:18px;z-index:5}.brand{font-size:20px;font-weight:900;letter-spacing:.02em;margin:0 0 4px}.sub{font-size:12px;color:#665d6d;line-height:1.55;margin:0 0 14px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}.actions button,.file-button{border:0;border-radius:9px;padding:10px 12px;background:#fff;color:#3b3042;font-weight:800;box-shadow:0 1px 4px #30243c20;cursor:pointer;text-align:center}.actions .primary{background:var(--accent);color:#fff}.group{border:1px solid var(--line);border-radius:10px;background:#fff;margin:0 0 10px;overflow:hidden}.group summary{cursor:pointer;font-size:13px;font-weight:900;padding:11px 12px;background:#faf9fb}.fields{padding:2px 12px 12px}.field{display:block;margin-top:9px}.field>span{display:block;font-size:11px;font-weight:800;color:#61586a;margin-bottom:4px}.field input[type=text],.field input[type=color],.field textarea,.field select{width:100%;border:1px solid #cfc7d5;border-radius:6px;background:#fff;font:13px/1.45 inherit;padding:7px}.field textarea{min-height:76px;resize:vertical}.field input[type=file]{font-size:11px;width:100%}.inline{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hint{font-size:10px;color:#796f80;line-height:1.45;margin:9px 0 0}.preview-wrap{padding:28px;overflow:auto}.toolbar{max-width:210mm;margin:0 auto 12px;display:flex;align-items:center;justify-content:space-between;color:#574e5c;font-size:12px}.pages{display:flex;flex-direction:column;align-items:center;gap:22px}.page{width:210mm;height:297mm;background:var(--paper);color:var(--ink);position:relative;overflow:hidden;box-shadow:0 5px 24px #2c203a35;font-family:"Noto Sans JP","Yu Gothic","Hiragino Kaku Gothic ProN",sans-serif}.p1{padding:14.5mm 20mm 16mm}.tagline{height:11mm;color:var(--accent);font-size:5.2mm;font-weight:900;border-bottom:.35mm solid var(--accent);padding-bottom:2mm;white-space:nowrap;overflow:hidden}.country-row{display:grid;grid-template-columns:1.5fr .82fr;gap:8mm;margin-top:8mm}.name-jp{font-size:11mm;font-weight:1000;line-height:1.05;letter-spacing:-.04em}.name-en{font-family:Impact,"Arial Narrow",sans-serif;color:var(--accent);font-size:4.1mm;letter-spacing:.12em;margin-top:2mm}.globe{width:43mm;height:43mm;border:1mm solid var(--accent);border-radius:50%;overflow:hidden;margin:-11mm auto 0;background:#edf2f7}.globe img{width:100%;height:100%;object-fit:cover}.globe::after{content:"位置図";display:grid;place-items:center;height:100%;font-weight:800;color:#9ba5b2;font-size:4mm}.globe.has img+.empty{display:none}.top-grid{display:grid;grid-template-columns:1.35fr 1.05fr;gap:8mm;margin-top:7mm}.flag-line{display:grid;grid-template-columns:1.2fr 1fr;gap:3mm;align-items:start}.flag{height:32mm;background:#f1f1f1;border:.4mm solid #111;position:relative;overflow:hidden}.flag img{width:100%;height:100%;object-fit:cover}.placeholder{position:absolute;inset:0;display:grid;place-items:center;color:#9b95a0;font-weight:800;font-size:3mm}.meaning-label{display:inline-block;border:.35mm solid var(--accent);padding:.7mm 1.2mm;color:var(--accent);font-size:3mm;font-weight:900}.meaning-text{font-size:3.6mm;line-height:1.35;font-weight:700;margin-top:2mm;max-height:25mm;overflow:hidden}.greeting{border:.45mm solid #111;margin-top:1mm;text-align:center;padding:1.4mm 2mm;font-size:3.4mm;font-weight:900}.hello{text-align:center;color:var(--accent);font-size:9mm;line-height:1.1;font-weight:1000;margin-top:4mm}.pron{text-align:center;color:var(--accent);font-size:5mm;font-weight:900;margin-top:2mm}.body-grid{display:grid;grid-template-columns:1.38fr .88fr;gap:10mm;margin-top:8mm;height:78mm}.intro{font-size:4mm;line-height:1.33;font-weight:700;text-align:justify;white-space:pre-wrap;overflow:hidden}.data-box{border-left:.5mm solid var(--accent);border-right:.5mm solid var(--accent);padding:2mm 5mm 0;font-size:3.4mm;line-height:1.45;font-weight:700;white-space:pre-wrap;overflow:hidden}.data-title{display:inline-block;color:var(--accent);font:4mm Impact,"Arial Narrow",sans-serif;letter-spacing:.15em;background:#fff;margin-top:-5mm;margin-bottom:2mm}.photos{display:grid;grid-template-columns:2.5fr 1fr;gap:7mm;margin-top:8mm;height:82mm}.photo{position:relative;overflow:hidden;background:#eee}.photo img{width:100%;height:100%;object-fit:cover}.small-photo{height:64mm}.caption{font-size:2.8mm;line-height:1.45;font-weight:700;margin-top:2mm}.p2{padding:18mm 19mm 14mm}.column{position:relative;border-top:.8mm solid var(--accent);border-bottom:.8mm solid var(--accent);border-radius:1mm;padding:7mm 5mm 5mm;margin-bottom:8mm}.column-label{position:absolute;top:-3mm;left:4mm;background:#fff;color:var(--accent);padding:0 1mm;font:3mm Impact,"Arial Narrow",sans-serif}.column-title{text-align:center;font-size:6.3mm;line-height:1.2;font-weight:1000;margin-bottom:5mm}.col-one{height:75mm}.col-one-body{display:grid;grid-template-columns:1.35fr .72fr;gap:5mm;height:54mm}.col-two{height:93mm;width:58%;padding-top:8mm}.column-text{font-size:4mm;line-height:1.32;font-weight:700;text-align:justify;white-space:pre-wrap;overflow:hidden}.column-image{position:relative;background:#eee;overflow:hidden;height:100%}.column-image img{width:100%;height:100%;object-fit:cover}.second-row{display:flex;gap:8mm}.second-image{width:38%;height:93mm;position:relative;background:#eee;overflow:hidden}.second-image img{width:100%;height:100%;object-fit:cover}.trivia{height:91mm;background:var(--wash);padding:7mm 6mm 4mm;position:relative}.trivia-tab{position:absolute;top:0;left:12mm;transform:translateY(-50%);background:var(--wash);border:.45mm solid var(--accent);padding:.7mm 2mm;font-size:3mm;font-weight:800}.trivia-title{border:.5mm solid var(--accent);height:10mm;text-align:center;color:var(--accent);font-size:5.2mm;line-height:9mm;font-weight:1000;margin-bottom:4mm}.fact{position:relative;padding-left:5mm;margin:0 0 3mm}.fact::before{content:"▶";position:absolute;left:0;color:var(--accent);font-size:3.4mm;top:.3mm}.fact-title{font-size:4mm;font-weight:1000;line-height:1.25}.fact-body{font-size:3.45mm;font-weight:700;line-height:1.32;white-space:pre-wrap}.fact-image{float:right;width:29mm;height:25mm;object-fit:cover;margin:1mm 0 1mm 4mm}.hide{display:none!important}.fit{overflow:hidden}.print-note{color:#6f6578}.empty{display:grid;place-items:center;position:absolute;inset:0;color:#9b95a0;font-weight:800;font-size:3mm}
+@media(max-width:1000px){.app{grid-template-columns:1fr}.panel{position:relative;height:auto}.preview-wrap{padding:12px}.page{transform-origin:top center}.pages{gap:0}}
+@media print{@page{size:A4;margin:0}body{background:#fff}.panel,.toolbar{display:none!important}.app{display:block}.preview-wrap{padding:0}.pages{display:block}.page{box-shadow:none;break-after:page;page-break-after:always;margin:0}.page:last-child{break-after:auto;page-break-after:auto}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+/* Print-fit corrections for the fixed A4 canvas. */
+.globe::after{display:none}.col-two{margin-bottom:0}.trivia{height:86mm}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="panel">
+  <h1 class="brand">塑史世界の歩き方</h1><p class="sub">国別ページジェネレータ。入力は即時反映・自動保存されます。</p>
+  <div class="actions"><button class="primary" id="printBtn">PDFを生成</button><button id="resetBtn">見本に戻す</button><button id="exportBtn">入力を保存</button><label class="file-button">入力を読込<input id="importFile" type="file" accept="application/json" hidden></label></div>
+  <details class="group" open><summary>基本情報</summary><div class="fields">
+    <label class="field"><span>キャッチコピー</span><input data-key="tagline" type="text"></label>
+    <label class="field"><span>国名（日本語）</span><input data-key="countryJa" type="text"></label>
+    <label class="field"><span>国名（英語など）</span><input data-key="countryEn" type="text"></label>
+    <div class="inline"><label class="field"><span>テーマ色</span><input id="accentColor" type="color"></label><label class="field"><span>雑学欄の色</span><input id="washColor" type="color"></label></div>
+    <label class="field"><span>国旗画像</span><input data-image="flag" type="file" accept="image/*"></label>
+    <label class="field"><span>「国旗の意味」見出し</span><input data-key="flagLabel" type="text"></label>
+    <label class="field"><span>国旗の意味</span><textarea data-key="flagMeaning"></textarea></label>
+    <label class="field"><span>位置図・地球儀画像</span><input data-image="globe" type="file" accept="image/*"></label>
+  </div></details>
+  <details class="group" open><summary>挨拶・概要・DATA</summary><div class="fields">
+    <label class="field"><span>挨拶欄の見出し</span><input data-key="greetingLabel" type="text"></label>
+    <label class="field"><span>挨拶（現地文字）</span><input data-key="hello" type="text"></label>
+    <label class="field"><span>読み</span><input data-key="pronunciation" type="text"></label>
+    <label class="field"><span>国の概要</span><textarea data-key="intro" style="min-height:150px"></textarea></label>
+    <label class="field"><span>DATA（改行ごとに入力）</span><textarea data-key="dataText" style="min-height:150px"></textarea></label>
+  </div></details>
+  <details class="group"><summary>1ページ目の写真</summary><div class="fields">
+    <label class="field"><span>大写真</span><input data-image="photoMain" type="file" accept="image/*"></label>
+    <label class="field"><span>小写真</span><input data-image="photoSub" type="file" accept="image/*"></label>
+    <label class="field"><span>写真キャプション</span><textarea data-key="photoCaption"></textarea></label>
+  </div></details>
+  <details class="group"><summary>COLUMN 1</summary><div class="fields">
+    <label class="field"><span>題名</span><input data-key="column1Title" type="text"></label>
+    <label class="field"><span>本文</span><textarea data-key="column1Text" style="min-height:130px"></textarea></label>
+    <label class="field"><span>画像</span><input data-image="column1Image" type="file" accept="image/*"></label>
+  </div></details>
+  <details class="group"><summary>COLUMN 2</summary><div class="fields">
+    <label class="field"><span>題名</span><input data-key="column2Title" type="text"></label>
+    <label class="field"><span>本文</span><textarea data-key="column2Text" style="min-height:130px"></textarea></label>
+    <label class="field"><span>画像</span><input data-image="column2Image" type="file" accept="image/*"></label>
+  </div></details>
+  <details class="group"><summary>雑学欄</summary><div class="fields">
+    <label class="field"><span>欄名</span><input data-key="triviaKicker" type="text"></label>
+    <label class="field"><span>大見出し</span><input data-key="triviaTitle" type="text"></label>
+    <label class="field"><span>雑学1・見出し</span><input data-key="fact1Title" type="text"></label>
+    <label class="field"><span>雑学1・本文</span><textarea data-key="fact1Body"></textarea></label>
+    <label class="field"><span>雑学1・画像（任意）</span><input data-image="fact1Image" type="file" accept="image/*"></label>
+    <label class="field"><span>雑学2・見出し</span><input data-key="fact2Title" type="text"></label>
+    <label class="field"><span>雑学2・本文</span><textarea data-key="fact2Body"></textarea></label>
+  </div></details>
+  <p class="hint">画像は各枠の中央を基準にトリミングされます。PDF保存時は、印刷画面で「背景のグラフィック」を有効にし、倍率100%・余白なしを選んでください。</p>
+</aside>
+<main class="preview-wrap"><div class="toolbar"><span>印刷プレビュー（A4・2ページ）</span><span class="print-note">ブラウザの印刷機能でPDF化</span></div><div class="pages">
+  <section class="page p1">
+    <div class="tagline fit" data-out="tagline"></div>
+    <div class="country-row"><div><div class="name-jp fit" data-out="countryJa"></div><div class="name-en fit" data-out="countryEn"></div></div><div class="globe image-slot" data-slot="globe"><img alt=""><div class="empty">位置図</div></div></div>
+    <div class="top-grid"><div class="flag-line"><div class="flag image-slot" data-slot="flag"><img alt=""><div class="placeholder">国旗</div></div><div><div class="meaning-label" data-out="flagLabel"></div><div class="meaning-text fit" data-out="flagMeaning"></div></div></div><div><div class="greeting fit" data-out="greetingLabel"></div><div class="hello fit" data-out="hello"></div><div class="pron fit" data-out="pronunciation"></div></div></div>
+    <div class="body-grid"><div class="intro fit" data-out="intro"></div><div class="data-box fit"><div class="data-title">DATA</div><div data-out="dataText"></div></div></div>
+    <div class="photos"><div class="photo image-slot" data-slot="photoMain"><img alt=""><div class="empty">大写真</div></div><div><div class="photo small-photo image-slot" data-slot="photoSub"><img alt=""><div class="empty">小写真</div></div><div class="caption fit" data-out="photoCaption"></div></div></div>
+  </section>
+  <section class="page p2">
+    <div class="column col-one"><span class="column-label">COLUMN</span><div class="column-title fit" data-out="column1Title"></div><div class="col-one-body"><div class="column-text fit" data-out="column1Text"></div><div class="column-image image-slot" data-slot="column1Image"><img alt=""><div class="empty">画像</div></div></div></div>
+    <div class="second-row"><div class="column col-two"><span class="column-label">COLUMN</span><div class="column-title fit" data-out="column2Title"></div><div class="column-text fit" data-out="column2Text"></div></div><div class="second-image image-slot" data-slot="column2Image"><img alt=""><div class="empty">画像</div></div></div>
+    <div class="trivia"><div class="trivia-tab" data-out="triviaKicker"></div><div class="trivia-title fit" data-out="triviaTitle"></div><div class="fact"><img class="fact-image hide" data-fact-image="fact1Image" alt=""><div class="fact-title fit" data-out="fact1Title"></div><div class="fact-body fit" data-out="fact1Body"></div></div><div class="fact"><div class="fact-title fit" data-out="fact2Title"></div><div class="fact-body fit" data-out="fact2Body"></div></div></div>
+  </section>
+</div></main></div>
+<script>
+const defaults={tagline:"「4000年の歴史」を今に伝えるアジアの超大国",countryJa:"清華人民共和国",countryEn:"People's Republic of Tsinghua",flagLabel:"国旗の意味",flagMeaning:"下の黄色い帯は肥沃な大地や黄河・長江。赤色の空の左上に毛沢東を示す星と4つの階級の星。",greetingLabel:"華国語でこんにちは",hello:"你好！",pronunciation:"（ニーハオ）",intro:"ユーラシア大陸に位置して、アジア圏ではソビエトに次いで広大な面積を有する国家。4000年にも渡る長い歴史はこの国に多くの遺産と数々のドラマを生み出した。\n50近い民族が織りなす重厚な文化はもちろん、外国文化が中華世界と融合し、新たな文化を創造している。",dataText:"人口：約14億1170万人\n面積：約957万7000km²\n首都：長征\n言語：華国語\n民族：漢族ほか\n宗教：なし\n通貨：人民元\n時差：日本より1時間遅れ",photoCaption:"左）経済発展著しい都市の夜景。上）王朝時代の名残を今に残す公園。",column1Title:"世界最大の古代城壁",column1Text:"清華世界遺産の代表、人類史上最大の建造物と言われている万里の長城。西端から東端まで長大な距離を走る。長城は北方騎馬民族の侵入を防ぐために築かれ、現在の形になったのは14世紀の時代。",column2Title:"「人民革命」の首都",column2Text:"清華政治の中心地である長征市。かつて北平・北京とも呼ばれたこの都市の名前は、革命を機に改称された。今でもその名残で、市内で旧名を冠する商店などを見かけることがある。",triviaKicker:"誰かに教えたくなる",triviaTitle:"清華の雑学",fact1Title:"奥深い中華茶の世界",fact1Body:"ウーロン茶などで知られる中華茶。清華では多くの茶が存在し、色で分類するほど。色の違いは製造法や発酵の有無、その過程によって生まれる。",fact2Title:"清華人民共和国外文出版社",fact2Body:"国内外文献の翻訳や旅行雑誌などを発行する出版社。本社には数々の貴重書が展示されており、一見の価値あり。",accent:"#7430a5",wash:"#fffed0",images:{}};
+let state=load();
+function load(){try{return {...defaults,...JSON.parse(localStorage.getItem("soshi-guide-generator")||"{}")}}catch(e){return structuredClone(defaults)}}
+function save(){try{localStorage.setItem("soshi-guide-generator",JSON.stringify(state))}catch(e){console.warn("画像が大きいため自動保存できません",e)}}
+function render(){document.querySelectorAll("[data-key]").forEach(el=>{if(document.activeElement!==el)el.value=state[el.dataset.key]??""});document.querySelectorAll("[data-out]").forEach(el=>el.textContent=state[el.dataset.out]??"");document.documentElement.style.setProperty("--accent",state.accent);document.documentElement.style.setProperty("--wash",state.wash);document.getElementById("accentColor").value=state.accent;document.getElementById("washColor").value=state.wash;document.querySelectorAll("[data-slot]").forEach(slot=>{const src=state.images?.[slot.dataset.slot];const img=slot.querySelector("img");img.src=src||"";slot.classList.toggle("has",!!src);slot.querySelector(".empty,.placeholder")?.classList.toggle("hide",!!src)});const fact=state.images?.fact1Image;const fi=document.querySelector("[data-fact-image]");fi.src=fact||"";fi.classList.toggle("hide",!fact);requestAnimationFrame(fitAll)}
+function fitAll(){document.querySelectorAll(".fit").forEach(el=>{el.style.fontSize="";let size=parseFloat(getComputedStyle(el).fontSize),guard=0;while((el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1)&&size>7&&guard++<45){size-=.4;el.style.fontSize=size+"px"}})}
+document.querySelectorAll("[data-key]").forEach(el=>el.addEventListener("input",()=>{state[el.dataset.key]=el.value;save();render()}));
+document.querySelectorAll("[data-image]").forEach(el=>el.addEventListener("change",()=>{const f=el.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{state.images={...(state.images||{}),[el.dataset.image]:reader.result};save();render()};reader.readAsDataURL(f)}));
+document.getElementById("accentColor").addEventListener("input",e=>{state.accent=e.target.value;save();render()});document.getElementById("washColor").addEventListener("input",e=>{state.wash=e.target.value;save();render()});
+document.getElementById("printBtn").onclick=()=>{fitAll();setTimeout(()=>window.print(),100)};
+document.getElementById("resetBtn").onclick=()=>{if(confirm("入力内容と画像を見本に戻しますか？")){state=structuredClone(defaults);save();render()}};
+document.getElementById("exportBtn").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}));a.download=(state.countryJa||"国別ページ")+"_入力データ.json";a.click();URL.revokeObjectURL(a.href)};
+document.getElementById("importFile").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{state={...defaults,...JSON.parse(r.result)};save();render()}catch(_){alert("JSONを読み込めませんでした")}};r.readAsText(f)});
+window.addEventListener("resize",fitAll);render();
+</script>
+</body></html>
